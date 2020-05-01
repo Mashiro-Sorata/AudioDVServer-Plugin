@@ -2,7 +2,6 @@
 #include "../include/a2fft_server.h"
 #include "../include/sha1.h"
 #include "../include/base64.h"
-//#include "../include/defs.h"
 
 
 //---------------WebSocket服务函数------------------
@@ -255,7 +254,7 @@ static int wsRead(SOCKET client, char* data, uint32_t len)
 	return 0;
 }
 
-int wsSend(SOCKET client, char* data, uint32_t len)
+static int wsSend(SOCKET client, char* data, uint32_t len)
 {
 	int flag;
 	uint32_t length;
@@ -274,11 +273,7 @@ int wsSend(SOCKET client, char* data, uint32_t len)
 		}
 		flag = send(client, psend, length, 0);
 		delete psend;
-		if (flag < 0)
-		{
-			return -1;
-		}
-		return 0;
+		return flag;
 	}
 	return -1;
 }
@@ -293,7 +288,6 @@ const int CA2FFTServer::Gap[64] = { 1, 2, 2, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1, 2, 2,
 
 
 
-const u_short CA2FFTServer::PORT = 5050;
 const u_short CA2FFTServer::INTERVAL = 25;
 const u_short CA2FFTServer::SENDLENGTH = 128;
 const u_short CA2FFTServer::MONOSENDLENGTH = CA2FFTServer::SENDLENGTH / 2;
@@ -312,17 +306,17 @@ float* CA2FFTServer::lSendBuffer = NULL;
 float* CA2FFTServer::rSendBuffer = NULL;
 
 
-CA2FFTServer::CA2FFTServer(const char* ip, u_short port, int maxconn)
+CA2FFTServer::CA2FFTServer(const char* ip, u_short port, int maxClients)
 {
 	ip_ = inet_addr(ip);
-	port_ = (port < 1 || port > 65535) ? htons(PORT) : htons(port);
-	maxConN_ = (maxconn < 1) ? SOMAXCONN : maxconn;
+	port_ = (port < 1 || port > 65535) ? htons(DEFAULT_PORT) : htons(port);
+	maxClients_ = (maxClients < 1) ? DEFAULT_MAXCLIENTS : maxClients;
 	socketServer_ = NULL;
 	mainLoopServiceID_ = NULL;
 	sendBuffer = new float[SENDLENGTH];
 	lSendBuffer = new float[MONOSENDLENGTH];
 	rSendBuffer = new float[MONOSENDLENGTH];
-	clientsVector.reserve(maxConN_);
+	clientsVector.reserve(maxClients_);
 
 	audioCapture = new CADataCapture();
 }
@@ -330,14 +324,14 @@ CA2FFTServer::CA2FFTServer(const char* ip, u_short port, int maxconn)
 CA2FFTServer::CA2FFTServer()
 {
 	ip_ = htonl(INADDR_LOOPBACK);
-	port_ = htons(PORT);
-	maxConN_ = SOMAXCONN;
+	port_ = htons(DEFAULT_PORT);
+	maxClients_ = DEFAULT_MAXCLIENTS;
 	socketServer_ = NULL;
 	mainLoopServiceID_ = NULL;
 	sendBuffer = new float[SENDLENGTH];
 	lSendBuffer = new float[MONOSENDLENGTH];
 	rSendBuffer = new float[MONOSENDLENGTH];
-	clientsVector.reserve(maxConN_);
+	clientsVector.reserve(maxClients_);
 
 	audioCapture = new CADataCapture();
 }
@@ -438,45 +432,45 @@ unsigned int __stdcall CA2FFTServer::MainLoopService(PVOID pParam)
 	char buff[1024];
 	std::string strout;
 	SOCKADDR_IN acceptAddr;
-	SOCKET socketAccept;
+	SOCKET socketClient;
 	while (control)
 	{
-		if (clientNum < ((CA2FFTServer*)pParam)->maxConN_)
+		if (clientNum < ((CA2FFTServer*)pParam)->maxClients_)
 		{
-			socketAccept = accept(((CA2FFTServer*)pParam)->socketServer_,
+			socketClient = accept(((CA2FFTServer*)pParam)->socketServer_,
 				(SOCKADDR*)&acceptAddr, &skAddrLength);
-			if (socketAccept == SOCKET_ERROR)
+			if (socketClient == SOCKET_ERROR)
 			{
-				LOG_WARN(L"连接失败1!");
+				LOG_WARN(L"尝试连接失败!");
 			}
 			else
 			{
-				len = recv(socketAccept, buff, 1024, 0);
+				len = recv(socketClient, buff, 1024, 0);
 				if (len > 0)
 				{
 					std::string str = buff;
 					if (isWSHandShake(str) == true)
 					{
 						wsHandshake(str, strout);
-						send(socketAccept, (char*)(strout.c_str()), strout.size(), 0);
+						send(socketClient, (char*)(strout.c_str()), strout.size(), 0);
 						if (clientNum == 0)
 						{
 							audioCapture->Start();
 						}
 						clientNum++;
 						clientsMutex.lock();
-						clientsVector.push_back(socketAccept);
+						clientsVector.push_back(socketClient);
 						clientsMutex.unlock();
 						LOG_INFO(L"连接成功!");
 					}
 					else
 					{
-						LOG_WARN(L"连接失败2!");
+						LOG_WARN(L"WebSocket握手失败!");
 					}
 				}
 				else
 				{
-					LOG_WARN(L"连接失败3!");
+					LOG_WARN(L"数据接受失败!");
 				}
 			}
 		}
@@ -502,7 +496,7 @@ void CA2FFTServer::SendToClients(char* buffer)
 		if (send_len < 0)
 		{
 			//客户端断开连接
-			LOG_WARN(L"发送失败!");
+			LOG_WARN(L"断开连接!");
 			if (clientNum == 1)
 			{
 				audioCapture->Stop();
@@ -521,7 +515,9 @@ void CA2FFTServer::SendToClients(char* buffer)
 
 unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 {
+	//将buff区以float的形式读取
 	float* pfData;
+	//数据包定位符，将数据包的数据凑满dataSize个后进行处理
 	UINT32 desPtn = 0;
 	UINT32 srcPtn = 0;
 	INT32 packRem = 0;

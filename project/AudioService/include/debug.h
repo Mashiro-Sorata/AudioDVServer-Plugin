@@ -3,16 +3,15 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
-//测试
+//测试日志开关
 #define DEBUG_SWITCH
-//用NERvLogInfo输出
-#define NER_OUT
 
 
 #ifdef DEBUG_SWITCH
 #include<iostream>
 
-
+//用NERvLogInfo输出
+#define NER_OUT
 #ifdef NER_OUT
 
 #include <NERvGear/NERvSDK.h>
@@ -55,7 +54,15 @@
 
 #endif
 #else
-#define LOG(level, format, ...)
+
+#define LOG_INFO(format, ...)
+
+#define LOG_DEBUG(format, ...)
+
+#define LOG_WARN(format, ...)
+
+#define LOG_ERROR(format, ...)
+
 #endif // TEST
 
 

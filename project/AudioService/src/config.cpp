@@ -1,61 +1,71 @@
-#include <fstream>
 #include "../include/config.h"
+#include "../include/a2fft_server.h"
+#include "../include/debug.h"
 
+#define __T(x) L ## x
+#define _T(x) __T(x)
 
-
-bool ReadConfig(char** _ip, unsigned short* _port, int* _maxconn)
+static HMODULE GetSelfModuleHandle()
 {
-    Json::Value root;
-    std::ifstream ifs(CONFIGFILE);
-    if (ifs.fail())
-    {
-        LOG_WARN(L"打开配置文件失败!");
-        *_ip = NULL;
-        *_port = 0;
-        *_maxconn = 0;
-        return false;
-    }
-    LOG_INFO(L"打开配置文件成功!");
-    Json::CharReaderBuilder builder;
-    builder["collectComments"] = true;
-    if (!parseFromStream(builder, ifs, &root, NULL))
-    {
-        *_ip = NULL;
-        *_port = 0;
-        *_maxconn = 0;
-        return false;
-    }
-    try
-    {
-        std::string sip = root["ip"].asString();
-        memcpy(*_ip, sip.c_str(), sip.size() + 1);
-        *_port = root["port"].asUInt();
-        *_maxconn = root["maxconn"].asInt();
-    }
-    catch (Json::LogicError e)
-    {
-        *_ip = NULL;
-        *_port = 0;
-        *_maxconn = 0;
-        return false;
-    }
-    return true;
+    MEMORY_BASIC_INFORMATION mbi;
+    return ((::VirtualQuery(GetSelfModuleHandle, &mbi, sizeof(mbi)) != 0) ? 
+                                        (HMODULE)mbi.AllocationBase : NULL);
 }
 
-bool IsIpFormatRight(char* ipAddress)
-{//判断IP地址是否合法
-    if (NULL == ipAddress)
-    {
-        return false;
-    }
-    int a, b, c, d;
-    if ((sscanf_s(ipAddress, "%d.%d.%d.%d", &a, &b, &c, &d) == 4)
-        && (a >= 0 && a <= 255)
-        && (b >= 0 && b <= 255)
-        && (c >= 0 && c <= 255)
-        && (d >= 0 && d <= 255))
-    {
-        return true;
-    }
-    return false;
+static void TCHAR2Char(const TCHAR* tchar, char* _char)
+{
+    //获取字节长度   
+    int iLength;
+    iLength = WideCharToMultiByte(CP_ACP, 0, tchar, -1, NULL, 0, NULL, NULL);
+    //将tchar值赋给_char
+    WideCharToMultiByte(CP_ACP, 0, tchar, -1, _char, iLength, NULL, NULL);
 }
+
+void String2TCHAR(const std::string _str, TCHAR* tchar)
+{
+    MultiByteToWideChar(CP_ACP, 0, (LPCSTR)_str.c_str(), -1, tchar, 256);
+}
+
+static void GetInstanceFolderPath(std::string* dirPath)
+{
+    std::string exePath = "";
+    TCHAR tcFullPath[MAX_PATH];
+    char pChPath[MAX_PATH];
+    memset(pChPath, '\0', MAX_PATH);
+    /* 获取当前dll的执行路径exe路径 */
+    GetModuleFileName(GetSelfModuleHandle(), tcFullPath, MAX_PATH);
+    /** 将tchar转为char */
+    TCHAR2Char(tcFullPath, pChPath);
+    exePath = std::string(pChPath);
+    size_t iPos = exePath.rfind("\\");
+    *dirPath = exePath.substr(0, iPos+1);
+}
+
+
+void ReadConfig(char** _ip, unsigned short* _port, int* _maxClient)
+{
+    LOG_INFO(_T("读取配置文件..."));
+    std::string dirPath;
+    GetInstanceFolderPath(&dirPath);
+    //std::ofstream out("log.txt");
+    //out << dirPath << std::endl;
+    //out.close();
+    TCHAR wdirPath[MAX_PATH];
+    TCHAR w_ip[17];
+    char c_ip[17];
+    String2TCHAR(dirPath + CONFIGFILE, wdirPath);
+    GetPrivateProfileString(_T("server"), _T("ip"), _T(DEFAULT_IP_LOCAL), w_ip, 17, wdirPath);
+    if (!lstrcmp(_T("ANY"),w_ip))
+    {
+        LOG_DEBUG(_T("INADDR_ANY"));
+        strcpy(*_ip, DEFAULT_IP_ANY);
+    }
+    else
+    {
+        LOG_DEBUG(_T("INADDR_ANY"));
+        strcpy(*_ip, DEFAULT_IP_LOCAL);
+    }
+    *_port = GetPrivateProfileInt(_T("server"), _T("port"), DEFAULT_PORT, wdirPath);
+    *_maxClient = GetPrivateProfileInt(_T("server"), _T("maxclient"), DEFAULT_MAXCLIENTS, wdirPath);
+}
+

@@ -20,6 +20,7 @@
 #include "../include/defs.h"
 #include "../include/a2fft_server.h"
 #include "../include/config.h"
+#include "../include/debug.h"
 
 using namespace NERvGear;
 
@@ -28,7 +29,7 @@ using namespace NERvGear;
 /// variables
 /// ----------------------------------------------------------------------------
 CA2FFTServer* audioServer;
-char* srv_ip = new char[20];
+char* srv_ip;
 u_short srv_port = 5050;
 int srv_maxconn = 5;
 
@@ -64,32 +65,25 @@ NVG_NO_COMPONENT_REGISTER(CAudioDVServer)
 
 long CAudioDVServer::OnInitial()
 {
-    NERvLogInfo(NVG_TEXT(NAME_STRING), L"Initial CAudioDVServer!");
-    if (!ReadConfig(&srv_ip, &srv_port, &srv_maxconn))
-    {
-        audioServer = new CA2FFTServer();
-        return PluginImpl::OnInitial();
-    }
-    if (NULL != srv_ip && IsIpFormatRight(srv_ip))
-    {
-        audioServer = new CA2FFTServer(srv_ip, srv_port, srv_maxconn);
-        return PluginImpl::OnInitial();
-    }
-    audioServer = new CA2FFTServer();
+    LOG_INFO(L"Initial CAudioDVServer!");
+    srv_ip = new char[17];
+    ReadConfig(&srv_ip, &srv_port, &srv_maxconn);
+    audioServer = new CA2FFTServer(srv_ip, srv_port, srv_maxconn);
     return PluginImpl::OnInitial();
 }
 
 long CAudioDVServer::OnRelease()
 {
-    NERvLogInfo(NVG_TEXT(NAME_STRING), L"Exit CAudioDVServer!");
+    LOG_INFO(L"Exit CAudioDVServer!");
     audioServer->ExitServer();
-    //delete audioServer;
+    delete[] srv_ip;
+    delete audioServer;
     return PluginImpl::OnRelease();
 }
 
 long CAudioDVServer::OnReady()
 {
-    NERvLogInfo(NVG_TEXT(NAME_STRING), L"Start CAudioDVServer!");
+    LOG_INFO(L"Start CAudioDVServer!");
     audioServer->StartServer();
     return PluginImpl::OnReady();
 }

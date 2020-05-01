@@ -46,26 +46,28 @@ enum WS_FrameType
 
 
 
+#define DEFAULT_IP_LOCAL "127.0.0.1"
+#define DEFAULT_IP_ANY "0.0.0.0"
+#define DEFAULT_PORT 5050
+#define DEFAULT_MAXCLIENTS SOMAXCONN
 
-//声明服务类
+
+//声明类
 class CA2FFTServer
 {
 public:
-	CA2FFTServer(const char* ip, u_short port, int maxconn);
+	CA2FFTServer(const char* ip, u_short port, int maxClients);
 	CA2FFTServer();
 	~CA2FFTServer();
 
-	virtual bool Initial();
-	virtual inline bool StartServer();
-	virtual inline bool ExitServer();
-	virtual inline bool RebootServer();
+	bool StartServer();
+	bool ExitServer();
+	bool RebootServer();
 
 	
 
 	//检测客户端的间隔时间
 	static const u_short INTERVAL;
-	//默认端口号
-	static const u_short PORT;
 	//发送长度
 	static const u_short SENDLENGTH;
 	//单声道发送长度
@@ -75,53 +77,35 @@ public:
 	static const int Gap[64];
 
 private:
-
-	static unsigned int __stdcall MainLoopService(PVOID pParam);
-	static unsigned int __stdcall BufferSenderService(PVOID pParam);
+	bool Initial();
 	bool StartMainLoopService();
 	bool StartBufferSenderService();
-
+	static unsigned int __stdcall MainLoopService(PVOID pParam);
+	static unsigned int __stdcall BufferSenderService(PVOID pParam);
 	void SendToClients(char* buffer);
 	
 	static CADataCapture* audioCapture;
 
 	//状态控制:1->运行,0->停止
 	static std::atomic<bool> control;
-	//连接到服务端的client数量,减少对子线程的阻塞
+	//记录连接到服务端的client数量
 	static std::atomic<u_short> clientNum;
 
 	//向量存放客户端地址
 	static std::vector<SOCKET> clientsVector;
-	//保证clients不能同时操作
+	//保证clientsVector不能同时操作
 	static std::mutex clientsMutex;
 
-	//将buff区以float的形式读取
-	//static float* pfData;
-	//数据包定位符，将数据包的数据凑满dataSize个后进行处理
-	//static UINT32 desPtn;
-	//static UINT32 srcPtn;
-	//static INT32 packRem;
-
-	//FFT
-	//static audiofft::AudioFFT fft;
 	//每次处理的数据个数
 	static const UINT32 dataSize;
 	static const size_t complexSize;
-
-	//static std::vector<float> lData;
-	//static std::vector<float> rData;
-
-	//static std::vector<float> lRe;
-	//static std::vector<float> lImg;
-	//static std::vector<float> rRe;
-	//static std::vector<float> rImg;
 
 	//Server的地址:默认0.0.0.0
 	u_long ip_;
 	//端口号:默认5050
 	u_short port_;
 	//最大连接数
-	int maxConN_;
+	int maxClients_;
 
 	//发送缓冲区
 	static float* sendBuffer;
