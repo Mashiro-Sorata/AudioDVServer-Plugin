@@ -42,6 +42,12 @@
     <ClInclude Include="include\main_adv_server.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="include\base64.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\sha1.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\audiocapture.cpp">
@@ -60,6 +66,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="src\main_adv_server.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\base64.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\sha1.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

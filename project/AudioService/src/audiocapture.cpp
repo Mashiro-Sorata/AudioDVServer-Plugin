@@ -26,40 +26,40 @@ HRESULT CADataCapture::Initial()
 	HRESULT hr;
 	hr = CoInitialize(NULL);
 	if (FAILED(hr)) {
-		LOG(ERR, L"Faild to CoInitialize");
+		LOG_ERROR(L"Faild to CoInitialize");
 		return hr;
 	}
 
 	hr = CoCreateInstance(CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, IID_IMMDeviceEnumerator, (void**)&pEnumerator);
 	if (FAILED(hr)) {
-		LOG(ERR, L"Faild to CoCreateInstance");
+		LOG_ERROR(L"Faild to CoCreateInstance");
 		return hr;
 	}
 
 	// get default output audio endpoint
 	hr = pEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &pDevice);
 	if (FAILED(hr)) {
-		LOG(ERR, L"Faild to GetDefaultAudioEndpoint");
+		LOG_ERROR(L"Faild to GetDefaultAudioEndpoint");
 		return hr;
 	}
 
 	// activates device
 	hr = pDevice->Activate(IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&pAudioClient);
 	if (FAILED(hr)) {
-		LOG(ERR, L"Faild to Activate Decive");
+		LOG_ERROR(L"Faild to Activate Decive");
 		return hr;
 	}
 
 	// gets audio format
 	hr = pAudioClient->GetMixFormat(&pwfx);
 	if (FAILED(hr)) {
-		LOG(ERR, L"Faild to GetMixFormat");
+		LOG_ERROR(L"Faild to GetMixFormat");
 		return hr;
 	}
 
 	hr = pAudioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK, REFTIMES_PER_SEC, 0, pwfx, NULL);
 	if (FAILED(hr)) {
-		LOG(ERR, L"Faild to Initialize Audio Client");
+		LOG_ERROR(L"Faild to Initialize Audio Client");
 		return hr;
 	}
 
@@ -67,13 +67,13 @@ HRESULT CADataCapture::Initial()
 	// Get the size of the allocated buffer.
 	hr = pAudioClient->GetBufferSize(&bufferFrameCount);
 	if (FAILED(hr)) {
-		LOG(ERR, L"Faild to GetBufferSize");
+		LOG_ERROR(L"Faild to GetBufferSize");
 		return hr;
 	}
 
 	hr = pAudioClient->GetService(IID_IAudioCaptureClient, (void**)&pCaptureClient);
 	if (FAILED(hr)) {
-		LOG(ERR, L"Faild to GetService");
+		LOG_ERROR(L"Faild to GetService");
 		return hr;
 	}
 	return S_OK;
@@ -86,7 +86,7 @@ HRESULT CADataCapture::Start()
 	
 	if (FAILED(hr))
 	{
-		LOG(ERR, L"Failed to Start");
+		LOG_ERROR(L"Failed to Start");
 		return hr;
 	}
 	CoInitializeEx(NULL, COINIT_MULTITHREADED);
@@ -99,7 +99,7 @@ HRESULT CADataCapture::Stop()
 	hr = pAudioClient->Stop();
 	if (FAILED(hr))
 	{
-		LOG(ERR, L"Failed to Stop");
+		LOG_ERROR(L"Failed to Stop");
 	}
 	return hr;
 }

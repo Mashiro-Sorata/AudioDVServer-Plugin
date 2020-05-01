@@ -1,6 +1,286 @@
 #include <cmath>
 #include "../include/a2fft_server.h"
+#include "../include/sha1.h"
+#include "../include/base64.h"
+//#include "../include/defs.h"
 
+
+
+//---------------WebSocket服务函数------------------
+
+/*
+1.握手。
+client第一次connet连接会发起握手协议，server在recv接收处解析，
+判断如果是websocket的握手协议，那么同样组装好特定格式包头回复给client，建立连接。
+*/
+//判断是不是websocket协议
+static bool isWSHandShake(std::string& request)
+{
+	size_t i = request.find("GET");
+	if (i == std::string::npos) {
+		return false;
+	}
+	return true;
+}
+
+//如果是，解析握手协议重新组装准备send回复给client
+static bool wsHandshake(std::string& request, std::string& response)
+{
+	//得到客户端请求信息的key
+	std::string tempKey = request;
+	size_t i = tempKey.find("Sec-WebSocket-Key");
+	if (i == std::string::npos) {
+		return false;
+	}
+	tempKey = tempKey.substr(i + 19, 24);
+
+	//拼接协议返回给客户端
+	response = "HTTP/1.1 101 Switching Protocols\r\n";
+	response += "Connection: upgrade\r\n";
+	response += "Sec-WebSocket-Accept: ";
+
+	std::string realKey = tempKey;
+	realKey += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+	SHA1 sha;
+	unsigned int message_digest[5];
+	sha.Reset();
+	sha << realKey.c_str();
+	sha.Result(message_digest);
+	for (int i = 0; i < 5; i++) {
+		message_digest[i] = htonl(message_digest[i]);
+	}
+	realKey = base64_encode(reinterpret_cast<const unsigned char*>(message_digest), 20);
+	realKey += "\r\n";
+	response += realKey.c_str();
+	response += "Upgrade: websocket\r\n\r\n";
+	return true;
+}
+
+/*
+2.接收client协议解析
+首先解析包头信息
+*/
+static bool wsReadHeader(char* cData, WebSocketStreamHeader* header)
+{
+	if (cData == NULL) return false;
+
+	const char* buf = cData;
+	header->fin = buf[0] & 0x80;
+	header->masked = buf[1] & 0x80;
+	unsigned char stream_size = buf[1] & 0x7F;
+
+	header->opcode = buf[0] & 0x0F;
+	// if (header->opcode == WS_FrameType::WS_CONTINUATION_FRAME) {  
+	//     //连续帧  
+	//     return false;  
+	// }
+	if (header->opcode == WS_TEXT_FRAME) {
+		//文本帧  
+	}
+	else if (header->opcode == WS_BINARY_FRAME) {
+		//二进制帧
+	}
+	else if (header->opcode == WS_CLOSING_FRAME) {
+		//连接关闭消息  
+		return true;
+	}
+	else if (header->opcode == WS_PING_FRAME) {
+		//  ping  
+		return false;
+	}
+	else if (header->opcode == WS_PONG_FRAME) {
+		// pong  
+		return false;
+	}
+	else {
+		//非法帧  
+		return false;
+	}
+
+	if (stream_size <= 125) {
+		//  small stream  
+		header->header_size = 6;
+		header->payload_size = stream_size;
+		header->mask_offset = 2;
+	}
+	else if (stream_size == 126) {
+		//  medium stream   
+		header->header_size = 8;
+		unsigned short s = 0;
+		memcpy(&s, (const char*)&buf[2], 2);
+		header->payload_size = ntohs(s);
+		header->mask_offset = 4;
+	}
+	else if (stream_size == 127) {
+
+		unsigned long long l = 0;
+		memcpy(&l, (const char*)&buf[2], 8);
+
+		header->payload_size = l;
+		header->mask_offset = 10;
+	}
+	else {
+		//Couldnt decode stream size 非法大小数据包  
+		return false;
+	}
+
+	/*  if (header->payload_size > MAX_WEBSOCKET_BUFFER) {
+	return false;
+	} */
+
+	return true;
+}
+
+//然后根据包头解析出真实数据
+static bool wsDecodeFrame(WebSocketStreamHeader* header, char cbSrcData[], unsigned short wSrcLen, char cbTagData[])
+{
+	const  char* final_buf = cbSrcData;
+	if (wSrcLen < header->header_size + 1) {
+		return false;
+	}
+
+	char masks[4];
+	memcpy(masks, final_buf + header->mask_offset, 4);
+	memcpy(cbTagData, final_buf + header->mask_offset + 4, header->payload_size);
+
+	for (unsigned int i = 0; i < header->payload_size; ++i) {
+		cbTagData[i] = (cbTagData[i] ^ masks[i % 4]);
+	}
+	//如果是文本包，在数据最后加一个结束字符“\0”
+	if (header->opcode == WS_TEXT_FRAME)
+		cbTagData[header->payload_size] = '\0';
+
+	return true;
+}
+
+//3.组装server发给client协议
+static bool wsEncodeFrame(std::string inMessage, std::string& outFrame, enum WS_FrameType frameType)
+{
+	const uint32_t messageLength = inMessage.size();
+	if (messageLength > 32767)
+	{
+		// 暂不支持这么长的数据  
+		return false;
+	}
+
+	uint8_t payloadFieldExtraBytes = (messageLength <= 0x7d) ? 0 : 2;
+	// header: 2字节, mask位设置为0(不加密), 则后面的masking key无须填写, 省略4字节  
+	uint8_t frameHeaderSize = 2 + payloadFieldExtraBytes;
+	uint8_t* frameHeader = new uint8_t[frameHeaderSize];
+	memset(frameHeader, 0, frameHeaderSize);
+
+	// fin位为1, 扩展位为0, 操作位为frameType  
+	frameHeader[0] = static_cast<uint8_t>(0x80 | frameType);
+
+	// 填充数据长度
+	if (messageLength <= 0x7d)
+	{
+		frameHeader[1] = static_cast<uint8_t>(messageLength);
+	}
+	else
+	{
+		frameHeader[1] = 0x7e;
+		uint16_t len = htons(messageLength);
+		memcpy(&frameHeader[2], &len, payloadFieldExtraBytes);
+	}
+
+	// 填充数据  
+	uint32_t frameSize = frameHeaderSize + messageLength;
+	char* frame = new char[frameSize + 1];
+	memcpy(frame, frameHeader, frameHeaderSize);
+	memcpy(frame + frameHeaderSize, inMessage.c_str(), messageLength);
+	outFrame = std::string(frame, frameSize);
+	delete[] frame;
+	delete[] frameHeader;
+	return true;
+}
+
+static char* wsEncodeFrameBytes(char* inMessage, enum WS_FrameType frameType, uint32_t* length)
+{
+	uint32_t messageLength;
+	if (*length == 0)
+		messageLength = strlen(inMessage) + 1;
+	else
+		messageLength = *length;
+	if (messageLength > 32767)
+	{
+		// 暂不支持这么长的数据  
+		return NULL;
+	}
+	uint8_t payloadFieldExtraBytes = (messageLength <= 0x7d) ? 0 : 2;
+	// header: 2字节, mask位设置为0(不加密), 则后面的masking key无须填写, 省略4字节  
+	uint8_t frameHeaderSize = 2 + payloadFieldExtraBytes;
+	uint8_t* frameHeader = new uint8_t[frameHeaderSize];
+	memset(frameHeader, 0, frameHeaderSize);
+
+	// fin位为1, 扩展位为0, 操作位为frameType  
+	frameHeader[0] = static_cast<uint8_t>(0x80 | frameType);
+
+	// 填充数据长度
+	if (messageLength <= 0x7d)
+	{
+		frameHeader[1] = static_cast<uint8_t>(messageLength);
+	}
+	else
+	{
+		frameHeader[1] = 0x7e;
+		uint16_t len = htons(messageLength);
+		memcpy(&frameHeader[2], &len, payloadFieldExtraBytes);
+	}
+
+	// 填充数据  
+	uint32_t frameSize = frameHeaderSize + messageLength;
+	char* frame = new char[frameSize + 1];
+	memcpy(frame, frameHeader, frameHeaderSize);
+	memcpy(frame + frameHeaderSize, inMessage, messageLength);
+	*length = frameSize;
+	delete[] frameHeader;
+	return frame;
+}
+
+static int wsRead(SOCKET client, char* data, uint32_t len)
+{
+	if (SOCKET_ERROR != client)
+	{
+		char* buff = new char[len];
+		len = recv(client, buff, len, 0);
+		if (len > 0)
+		{
+			WebSocketStreamHeader header;
+			wsReadHeader(buff, &header);
+			wsDecodeFrame(&header, buff, len, data);
+		}
+		delete[] buff;
+		return len;
+	}
+	return 0;
+}
+
+int wsSend(SOCKET client, char* data, uint32_t len)
+{
+	uint32_t length;
+	char* psend;
+	if (SOCKET_ERROR != client)
+	{
+		if (len == 0)
+		{
+			length = strlen(data);
+			psend = wsEncodeFrameBytes(data, WS_TEXT_FRAME, &length);
+		}
+		else
+		{
+			length = len;
+			psend = wsEncodeFrameBytes(data, WS_BINARY_FRAME, &length);
+		}
+		send(client, psend, length, 0);
+		delete psend;
+		return 0;
+	}
+	return -1;
+}
+
+
+//--------------CA2FFTServer类---------------------
 
 //与SENDLENGTH相关
 //将complexSize个fft数据压缩为SENDLENGTH/2个
@@ -88,33 +368,27 @@ bool CA2FFTServer::Initial()
 
 	//初始化Windows Sockets DLL
 	if (WSAStartup(w_req, &wsadata) != 0) {
-		//NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), L"初始化套接字库失败!");
-		LOG(ERR, L"初始化套接字库失败!");
+		LOG_ERROR(L"初始化套接字库失败!");
 		return false;
 	}
 	else
 	{
-		LOG(INFO, L"初始化套接字库成功!");
-		//NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), L"初始化套接字库成功!");
+		LOG_INFO(L"初始化套接字库成功!");
 	}
 	//检测版本号
 	if (LOBYTE(wsadata.wVersion) != 2 || HIBYTE(wsadata.wHighVersion) != 2) {
-		LOG(ERR, L"套接字库版本号不符!");
-		//NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), L"套接字库版本号不符!");
-		WSACleanup();
-		return false;
+		LOG_WARN(L"套接字库版本号不符!");
 	}
 	else
 	{
-		LOG(INFO, L"套接字库版本正确!");
-		//NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), L"套接字库版本正确!");
+		LOG_INFO(L"套接字库版本正确!");
 	}
 	//填充服务端信息
 	serverAddr_.sin_family = AF_INET;
 	serverAddr_.sin_addr.S_un.S_addr = ip_;
 	serverAddr_.sin_port = port_;
 	//创建套接字
-	socketServer_ = socket(AF_INET, SOCK_STREAM, 0);
+	socketServer_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	//接受连接请求
 
 	BOOL bReUseAddr = TRUE;
@@ -123,41 +397,42 @@ bool CA2FFTServer::Initial()
 	setsockopt(socketServer_, SOL_SOCKET, SO_DONTLINGER, (const char*)&bDontLinger, sizeof(BOOL));
 	if (bind(socketServer_, (SOCKADDR*)&serverAddr_, sizeof(SOCKADDR)) == SOCKET_ERROR)
 	{
-		LOG(ERR, L"套接字绑定失败!");
-		//NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), L"套接字绑定失败!");
+		LOG_ERROR(L"套接字绑定失败!");
 		WSACleanup();
 		return false;
 	}
 	else
 	{
-		LOG(INFO, L"套接字绑定成功!");
-		//NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), L"套接字绑定成功!");
+		LOG_INFO(L"套接字绑定成功!");
 	}
 
 	//设置套接字为监听状态
 	if (listen(socketServer_, SOMAXCONN) < 0)
 	{
-		LOG(ERR, L"设置监听状态失败!");
-		//NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), L"设置监听状态失败!");
+		LOG_ERROR(L"设置监听状态失败!");
 		WSACleanup();
 		return false;
 	}
 	else
 	{
-		LOG(INFO, L"设置监听状态成功!");
-		//NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), L"设置监听状态成功!");
+		LOG_INFO(L"设置监听状态成功!");
 	}
 
 	if (FAILED(audioCapture->Initial()))
 	{
-		return false;;
+		LOG_ERROR(L"初始化CADataCapture失败!");
+		return false;
 	}
+	LOG_INFO(L"初始化CADataCapture成功!");
 	return true;
 }
 
 unsigned int __stdcall CA2FFTServer::MainLoopService(PVOID pParam)
 {
-	int len = sizeof(SOCKADDR);
+	int skAddrLength = sizeof(SOCKADDR);
+	int len;
+	char buff[1024];
+	std::string strout;
 	SOCKADDR_IN acceptAddr;
 	SOCKET socketAccept;
 	while (control)
@@ -165,25 +440,40 @@ unsigned int __stdcall CA2FFTServer::MainLoopService(PVOID pParam)
 		if (clientNum < ((CA2FFTServer*)pParam)->maxConN_)
 		{
 			socketAccept = accept(((CA2FFTServer*)pParam)->socketServer_,
-				(SOCKADDR*)&acceptAddr, &len);
-			//LOG(INFO, "进入MainLoopService");
+				(SOCKADDR*)&acceptAddr, &skAddrLength);
 			if (socketAccept == SOCKET_ERROR)
 			{
-				LOG(WARN, L"连接失败!");
-				//NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), L"连接失败!");
+				LOG_WARN(L"连接失败1!");
 			}
 			else
 			{
-				if (clientNum == 0)
+				len = recv(socketAccept, buff, 1024, 0);
+				if (len > 0)
 				{
-					audioCapture->Start();
+					std::string str = buff;
+					if (isWSHandShake(str) == true)
+					{
+						wsHandshake(str, strout);
+						send(socketAccept, (char*)(strout.c_str()), strout.size(), 0);
+						if (clientNum == 0)
+						{
+							audioCapture->Start();
+						}
+						clientNum++;
+						clientsMutex.lock();
+						clientsVector.push_back(socketAccept);
+						clientsMutex.unlock();
+						LOG_INFO(L"连接成功!");
+					}
+					else
+					{
+						LOG_WARN(L"连接失败2!");
+					}
 				}
-				//NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), L"连接成功!");
-				clientNum++;
-				clientsMutex.lock();
-				clientsVector.push_back(socketAccept);
-				clientsMutex.unlock();
-				LOG(INFO, L"连接成功!");
+				else
+				{
+					LOG_WARN(L"连接失败3!");
+				}
 			}
 		}
 	}
@@ -204,12 +494,11 @@ void CA2FFTServer::SendToClients(char* buffer)
 	while (itr != clientsVector.end())
 	{
 		send_len = 0;
-		send_len = send(*itr, buffer, SENDLENGTH * sizeof(float), 0);
+		send_len = wsSend(*itr, buffer, SENDLENGTH * sizeof(float));
 		if (send_len < 0)
 		{
 			//客户端断开连接
-			LOG(WARN, L"发送失败!");
-			//NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), L"发送失败!");
+			LOG_WARN(L"发送失败!");
 			if (clientNum == 1)
 			{
 				audioCapture->Stop();
@@ -264,7 +553,6 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 		//当有客户端连接时采集音频数据处理
 		if (clientNum > 0)
 		{
-			//TO DO: 更新音频数据，得到FFT数据复制到s
 			//发送缓冲区数据给所有的client
 			hr = audioCapture->get_NextPacketSize();
 			if (audioCapture->packetLength == 0)
@@ -411,24 +699,24 @@ bool CA2FFTServer::StartServer()
 	control = true;
 	if (!Initial())
 	{
-		LOG(ERR, L"初始化失败!");
+		LOG_ERROR(L"初始化失败!");
 		return false;
 	}
-	LOG(INFO, L"初始化成功!");
+	LOG_INFO(L"初始化成功!");
 	ret = StartMainLoopService();
 	if (!ret)
 	{
-		LOG(ERR, L"开启主服务失败!");
+		LOG_ERROR(L"开启主服务失败!");
 		return false;
 	}
-	LOG(INFO, L"开启主服务成功!");
+	LOG_INFO(L"开启主服务成功!");
 	ret = StartBufferSenderService();
 	if (!ret)
 	{
-		LOG(ERR, L"开启发送服务失败!");
+		LOG_ERROR(L"开启发送服务失败!");
 		return false;
 	}
-	LOG(INFO, L"开启发送服务成功!");
+	LOG_INFO(L"开启发送服务成功!");
 	return true;
 }
 

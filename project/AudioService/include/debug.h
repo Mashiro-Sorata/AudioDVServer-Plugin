@@ -10,34 +10,49 @@
 
 
 #ifdef DEBUG_SWITCH
-
 #include<iostream>
-#define OFF   (0)
-#define FATAL (1)
-#define ERR (2)
-#define WARN  (3)
-#define INFO  (4)
-#define DEBUG (5)
-#define TRACE (6)
 
-#define LOG_LEVEL DEBUG
 
 #ifdef NER_OUT
 
 #include <NERvGear/NERvSDK.h>
 #include "../include/defs.h"
 
-#define LOG(level, format, ...) \
-	if(LOG_LEVEL >= level) { \
-		NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), format); \
-	}
+#define LOG_INFO(format, ...) NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), format)
+
+#define LOG_DEBUG(format, ...) NERvGear::NERvLogDebug(NVG_TEXT(NAME_STRING), format)
+
+#define LOG_WARN(format, ...) NERvGear::NERvLogWarn(NVG_TEXT(NAME_STRING), format)
+
+#define LOG_ERROR(format, ...) NERvGear::NERvLogError(NVG_TEXT(NAME_STRING), format)
 
 #else
-#define LOG(level, format, ...) \
-	if(LOG_LEVEL >= level) { \
-		fprintf(stderr, format "\n", \
-				#level, __func__, __FILE__, __LINE__, ##__VA_ARGS__ ); \
-    }
+#include <locale.h>
+
+#define LOG_INFO(format, ...) \
+{ \
+	setlocale(LC_CTYPE, ".936");\
+	wprintf(L"%ls: %ls\n", L"INFO", format);\
+}
+
+#define LOG_DEBUG(format, ...) \
+{ \
+	setlocale(LC_CTYPE, ".936");\
+	wprintf(L"%ls: %ls\n", L"DEBUG", format);\
+}
+
+#define LOG_WARN(format, ...) \
+{ \
+	setlocale(LC_CTYPE, ".936");\
+	wprintf(L"%ls: %ls\n", L"WARN", format);\
+}
+
+#define LOG_ERROR(format, ...) \
+{ \
+	setlocale(LC_CTYPE, ".936");\
+	wprintf(L"%ls: %ls\n", L"ERROR", format);\
+}
+
 #endif
 #else
 #define LOG(level, format, ...)
