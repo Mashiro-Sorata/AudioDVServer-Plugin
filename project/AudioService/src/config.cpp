@@ -9,13 +9,13 @@ bool ReadConfig(char** _ip, unsigned short* _port, int* _maxconn)
     std::ifstream ifs(CONFIGFILE);
     if (ifs.fail())
     {
-        LOG_WARN(L"打开文件失败!");
+        LOG_WARN(L"打开配置文件失败!");
         *_ip = NULL;
         *_port = 0;
         *_maxconn = 0;
         return false;
     }
-    LOG_WARN(L"打开文件成功!");
+    LOG_INFO(L"打开配置文件成功!");
     Json::CharReaderBuilder builder;
     builder["collectComments"] = true;
     if (!parseFromStream(builder, ifs, &root, NULL))

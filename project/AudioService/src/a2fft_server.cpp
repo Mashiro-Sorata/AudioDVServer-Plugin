@@ -5,7 +5,6 @@
 //#include "../include/defs.h"
 
 
-
 //---------------WebSocket·þÎñº¯Êý------------------
 
 /*
@@ -258,6 +257,7 @@ static int wsRead(SOCKET client, char* data, uint32_t len)
 
 int wsSend(SOCKET client, char* data, uint32_t len)
 {
+	int flag;
 	uint32_t length;
 	char* psend;
 	if (SOCKET_ERROR != client)
@@ -272,8 +272,12 @@ int wsSend(SOCKET client, char* data, uint32_t len)
 			length = len;
 			psend = wsEncodeFrameBytes(data, WS_BINARY_FRAME, &length);
 		}
-		send(client, psend, length, 0);
+		flag = send(client, psend, length, 0);
 		delete psend;
+		if (flag < 0)
+		{
+			return -1;
+		}
 		return 0;
 	}
 	return -1;
@@ -290,7 +294,7 @@ const int CA2FFTServer::Gap[64] = { 1, 2, 2, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1, 2, 2,
 
 
 const u_short CA2FFTServer::PORT = 5050;
-const u_short CA2FFTServer::INTERVAL = 5;
+const u_short CA2FFTServer::INTERVAL = 25;
 const u_short CA2FFTServer::SENDLENGTH = 128;
 const u_short CA2FFTServer::MONOSENDLENGTH = CA2FFTServer::SENDLENGTH / 2;
 
@@ -557,6 +561,7 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 			hr = audioCapture->get_NextPacketSize();
 			if (audioCapture->packetLength == 0)
 			{
+				Sleep(INTERVAL);
 				continue;
 			}
 			hr = audioCapture->get_Buffer();
