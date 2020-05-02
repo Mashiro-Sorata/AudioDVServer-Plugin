@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<?xml version="1.0" encoding="utf-8"?>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音频可视化网页插件</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #display {
+            margin: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="cvs" class="hidden" width="1280" height="600"></canvas>
+    <canvas id="display"></canvas>
+    <script src="adv.js"></script>
+    <script>
+    	var IP = "LOCAL";
+    	var PORT = 5050;
+        //引用插件
+        var adv = new ADV_Plugin(IP, PORT);
+
+        //画布缓冲
+        var cvs = document.getElementById("cvs");
+        var ctx = cvs.getContext("2d");
+
+        //画布绘制完成后更新显示
+        var display = document.getElementById("display");
+        var displayCtx = display.getContext("2d");
+
+        var data = new Array(128);
+        var animData = new Array(128);
+
+        // 初始化
+        for (var i = 0; i < 128; i++) {
+            data[i] = animData[i] = 0;
+        }
+
+        var peakValue = 1;
+
+        //调用事件接口更新数据
+        adv.ondata = function (audioData){
+            //数据归一化
+            var max = 0;
+            for (var i = 0; i < 128; i++) {
+                if (audioData[i] > max)
+                    max = audioData[i];
+            }
+
+            peakValue = peakValue * 0.99 + max * 0.01;
+
+            for (i = 0; i < 64; i++) {
+                data[63 - i] = audioData[i] / peakValue;
+            }
+
+            for (i = 0; i < 64; i++) {
+                data[127 - i] = audioData[127 - i] / peakValue;
+            }
+        };
+
+
+        function min(a, b) {
+            return a > b ? b : a;
+        }
+
+        //更新画面
+        function frame() {
+            for (var i = 0; i < 128; i++) {
+                animData[i] += (data[i] - animData[i]) * 0.3;
+                animData[i] = min(animData[i], 1);
+            }
+
+            //清空画布
+            ctx.clearRect(0, 0, 1280, 800);
+            
+            //分别为调整水平线倾斜角度,频谱倾斜角度,旋转角度
+            //ctx.transform(1, 5 * (Math.PI / 180), 0, 1, 0, 0);
+            //ctx.transform(0.9645, 0, -9 * (Math.PI / 180), 1, 0, 0);
+            //ctx.rotate(7 * (Math.PI / 180));
+
+            //分界线的颜色
+            ctx.fillStyle = "rgba(0,0,0,0.9)";
+            //绘制分界线
+            ctx.fillRect(-10, 320, 1400, 2);
+
+            //频谱线颜色
+            ctx.fillStyle = "rgba(248,248,255,0.6)";
+
+            //绘制频谱
+            for (var i = 0; i < 128; i++) {
+                ctx.fillRect(10 * i, 20 + (300 - 300 * animData[i]), 6, 600 * animData[i]);
+            }
+            ctx.resetTransform();
+            displayCtx.clearRect(0, 0, display.width, display.height);
+            displayCtx.drawImage(cvs, 0, 0, display.width, display.height);
+            window.requestAnimationFrame(frame);
+        }
+
+        window.requestAnimationFrame(frame);
+    </script>
+</body>
+
+</html>
