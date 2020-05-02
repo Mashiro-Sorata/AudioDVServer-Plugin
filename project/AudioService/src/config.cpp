@@ -2,8 +2,6 @@
 #include "../include/a2fft_server.h"
 #include "../include/debug.h"
 
-#define __T(x) L ## x
-#define _T(x) __T(x)
 
 static HMODULE GetSelfModuleHandle()
 {
@@ -54,18 +52,18 @@ void ReadConfig(char** _ip, unsigned short* _port, int* _maxClient)
     TCHAR w_ip[17];
     char c_ip[17];
     String2TCHAR(dirPath + CONFIGFILE, wdirPath);
-    GetPrivateProfileString(_T("server"), _T("ip"), _T(DEFAULT_IP_LOCAL), w_ip, 17, wdirPath);
-    if (!lstrcmp(_T("ANY"),w_ip))
+    GetPrivateProfileString(__T("server"), __T("ip"), __T(DEFAULT_IP_LOCAL), w_ip, 17, wdirPath);
+    if (!lstrcmp(__T("ANY"),w_ip))
     {
         LOG_DEBUG(_T("INADDR_ANY"));
         strcpy(*_ip, DEFAULT_IP_ANY);
     }
     else
     {
-        LOG_DEBUG(_T("INADDR_ANY"));
+        LOG_DEBUG(_T("INADDR_LOCAL"));
         strcpy(*_ip, DEFAULT_IP_LOCAL);
     }
-    *_port = GetPrivateProfileInt(_T("server"), _T("port"), DEFAULT_PORT, wdirPath);
-    *_maxClient = GetPrivateProfileInt(_T("server"), _T("maxclient"), DEFAULT_MAXCLIENTS, wdirPath);
+    *_port = GetPrivateProfileInt(__T("server"), __T("port"), DEFAULT_PORT, wdirPath);
+    *_maxClient = GetPrivateProfileInt(__T("server"), __T("maxclient"), DEFAULT_MAXCLIENTS, wdirPath);
 }
 

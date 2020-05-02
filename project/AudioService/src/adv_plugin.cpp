@@ -16,7 +16,7 @@
  /// ----------------------------------------------------------------------------
 #include <NERvGear/NERvSDK.h>
 
-#include "../include/main_adv_server.h"
+#include "../include/adv_plugin.h"
 #include "../include/defs.h"
 #include "../include/a2fft_server.h"
 #include "../include/config.h"
@@ -65,7 +65,7 @@ NVG_NO_COMPONENT_REGISTER(CAudioDVServer)
 
 long CAudioDVServer::OnInitial()
 {
-    LOG_INFO(L"Initial CAudioDVServer!");
+    LOG_INFO(_T("Initial CAudioDVServer!"));
     srv_ip = new char[17];
     ReadConfig(&srv_ip, &srv_port, &srv_maxconn);
     audioServer = new CA2FFTServer(srv_ip, srv_port, srv_maxconn);
@@ -74,7 +74,7 @@ long CAudioDVServer::OnInitial()
 
 long CAudioDVServer::OnRelease()
 {
-    LOG_INFO(L"Exit CAudioDVServer!");
+    LOG_INFO(_T("Exit CAudioDVServer!"));
     audioServer->ExitServer();
     delete[] srv_ip;
     delete audioServer;
@@ -83,7 +83,7 @@ long CAudioDVServer::OnRelease()
 
 long CAudioDVServer::OnReady()
 {
-    LOG_INFO(L"Start CAudioDVServer!");
+    LOG_INFO(_T("Start CAudioDVServer!"));
     audioServer->StartServer();
     return PluginImpl::OnReady();
 }

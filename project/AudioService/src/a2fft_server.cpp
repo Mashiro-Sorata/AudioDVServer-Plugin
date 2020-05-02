@@ -1,5 +1,5 @@
-#include <cmath>
 #include "../include/a2fft_server.h"
+#include "../include/AudioFFT.h"
 #include "../include/sha1.h"
 #include "../include/base64.h"
 
@@ -366,20 +366,20 @@ bool CA2FFTServer::Initial()
 
 	//初始化Windows Sockets DLL
 	if (WSAStartup(w_req, &wsadata) != 0) {
-		LOG_ERROR(L"初始化套接字库失败!");
+		LOG_ERROR(_T("初始化套接字库失败!"));
 		return false;
 	}
 	else
 	{
-		LOG_INFO(L"初始化套接字库成功!");
+		LOG_INFO(_T("初始化套接字库成功!"));
 	}
 	//检测版本号
 	if (LOBYTE(wsadata.wVersion) != 2 || HIBYTE(wsadata.wHighVersion) != 2) {
-		LOG_WARN(L"套接字库版本号不符!");
+		LOG_WARN(_T("套接字库版本号不符!"));
 	}
 	else
 	{
-		LOG_INFO(L"套接字库版本正确!");
+		LOG_INFO(_T("套接字库版本正确!"));
 	}
 	//填充服务端信息
 	serverAddr_.sin_family = AF_INET;
@@ -395,33 +395,33 @@ bool CA2FFTServer::Initial()
 	setsockopt(socketServer_, SOL_SOCKET, SO_DONTLINGER, (const char*)&bDontLinger, sizeof(BOOL));
 	if (bind(socketServer_, (SOCKADDR*)&serverAddr_, sizeof(SOCKADDR)) == SOCKET_ERROR)
 	{
-		LOG_ERROR(L"套接字绑定失败!");
+		LOG_ERROR(_T("套接字绑定失败!"));
 		WSACleanup();
 		return false;
 	}
 	else
 	{
-		LOG_INFO(L"套接字绑定成功!");
+		LOG_INFO(_T("套接字绑定成功!"));
 	}
 
 	//设置套接字为监听状态
 	if (listen(socketServer_, SOMAXCONN) < 0)
 	{
-		LOG_ERROR(L"设置监听状态失败!");
+		LOG_ERROR(_T("设置监听状态失败!"));
 		WSACleanup();
 		return false;
 	}
 	else
 	{
-		LOG_INFO(L"设置监听状态成功!");
+		LOG_INFO(_T("设置监听状态成功!"));
 	}
 
 	if (FAILED(audioCapture->Initial()))
 	{
-		LOG_ERROR(L"初始化CADataCapture失败!");
+		LOG_ERROR(_T("初始化CADataCapture失败!"));
 		return false;
 	}
-	LOG_INFO(L"初始化CADataCapture成功!");
+	LOG_INFO(_T("初始化CADataCapture成功!"));
 	return true;
 }
 
@@ -441,7 +441,7 @@ unsigned int __stdcall CA2FFTServer::MainLoopService(PVOID pParam)
 				(SOCKADDR*)&acceptAddr, &skAddrLength);
 			if (socketClient == SOCKET_ERROR)
 			{
-				LOG_WARN(L"尝试连接失败!");
+				LOG_WARN(_T("尝试连接失败!"));
 			}
 			else
 			{
@@ -461,16 +461,16 @@ unsigned int __stdcall CA2FFTServer::MainLoopService(PVOID pParam)
 						clientsMutex.lock();
 						clientsVector.push_back(socketClient);
 						clientsMutex.unlock();
-						LOG_INFO(L"连接成功!");
+						LOG_INFO(_T("连接成功!"));
 					}
 					else
 					{
-						LOG_WARN(L"WebSocket握手失败!");
+						LOG_WARN(_T("WebSocket握手失败!"));
 					}
 				}
 				else
 				{
-					LOG_WARN(L"数据接受失败!");
+					LOG_WARN(_T("数据接受失败!"));
 				}
 			}
 		}
@@ -496,7 +496,7 @@ void CA2FFTServer::SendToClients(char* buffer)
 		if (send_len < 0)
 		{
 			//客户端断开连接
-			LOG_WARN(L"断开连接!");
+			LOG_WARN(_T("断开连接!"));
 			if (clientNum == 1)
 			{
 				audioCapture->Stop();
@@ -700,24 +700,24 @@ bool CA2FFTServer::StartServer()
 	control = true;
 	if (!Initial())
 	{
-		LOG_ERROR(L"初始化失败!");
+		LOG_ERROR(_T("初始化失败!"));
 		return false;
 	}
-	LOG_INFO(L"初始化成功!");
+	LOG_INFO(_T("初始化成功!"));
 	ret = StartMainLoopService();
 	if (!ret)
 	{
-		LOG_ERROR(L"开启主服务失败!");
+		LOG_ERROR(_T("开启主服务失败!"));
 		return false;
 	}
-	LOG_INFO(L"开启主服务成功!");
+	LOG_INFO(_T("开启主服务成功!"));
 	ret = StartBufferSenderService();
 	if (!ret)
 	{
-		LOG_ERROR(L"开启发送服务失败!");
+		LOG_ERROR(_T("开启发送服务失败!"));
 		return false;
 	}
-	LOG_INFO(L"开启发送服务成功!");
+	LOG_INFO(_T("开启发送服务成功!"));
 	return true;
 }
 

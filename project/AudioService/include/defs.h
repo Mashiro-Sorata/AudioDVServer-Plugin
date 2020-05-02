@@ -8,8 +8,8 @@
 #define _TRANSLATE(_STR) _STR    // help poEdit to find translate string
 
 #define NAME_STRING    _TRANSLATE("AudioDVServer")
-#define DESCRIP_STRING _TRANSLATE("Plug-in for Audio Data Visualization.")
-#define COMMENT_STRING _TRANSLATE("The SAO Utils Plug-in by Mashiro_Sorata")
+#define DESCRIP_STRING _TRANSLATE("Audio Data Visualization Plug-in")
+#define COMMENT_STRING _TRANSLATE("The SAO Utils Plug-in by Mashiro_Sorata\nProject: https://github.com/Mashiro-Sorata/ADV-Plugin\n")
 
 #define VER_MAJOR    1
 #define VER_MINOR    0

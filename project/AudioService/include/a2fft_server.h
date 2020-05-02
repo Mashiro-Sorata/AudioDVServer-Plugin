@@ -1,5 +1,3 @@
-#pragma once
-
 #ifndef A2FFT_SERVER_H
 #define A2FFT_SERVER_H
 
@@ -9,11 +7,11 @@
 #include<atomic>
 #include<mutex>
 #include<vector>
-#include "../include/AudioFFT.h"
 #include "../include/audiocapture.h"
-
 //DEBUG
 #include "../include/debug.h"
+
+
 
 struct WebSocketStreamHeader {
 	unsigned int header_size;				//数据包头大小
