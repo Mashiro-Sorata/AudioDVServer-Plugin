@@ -19,7 +19,7 @@ static void TCHAR2Char(const TCHAR* tchar, char* _char)
     WideCharToMultiByte(CP_ACP, 0, tchar, -1, _char, iLength, NULL, NULL);
 }
 
-void String2TCHAR(const std::string _str, TCHAR* tchar)
+static void String2TCHAR(const std::string _str, TCHAR* tchar)
 {
     MultiByteToWideChar(CP_ACP, 0, (LPCSTR)_str.c_str(), -1, tchar, 256);
 }

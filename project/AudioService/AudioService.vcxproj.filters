@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\debug.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="include\audiocapture.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -33,19 +30,16 @@
     <ClInclude Include="include\config.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="include\json\json.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="include\json\json-forwards.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="include\main_adv_server.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="include\base64.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\sha1.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\adv_plugin.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\debug.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -56,22 +50,22 @@
     <ClCompile Include="src\AudioFFT.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="src\a2fft_server.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="src\config.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="src\jsoncpp.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="src\main_adv_server.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="src\base64.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="src\sha1.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\debug.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\adv_plugin.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\a2fft_server.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\config.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

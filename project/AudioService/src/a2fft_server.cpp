@@ -513,6 +513,7 @@ void CA2FFTServer::SendToClients(char* buffer)
 	clientsMutex.unlock();
 }
 
+
 unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 {
 	//将buff区以float的形式读取
