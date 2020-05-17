@@ -297,7 +297,7 @@ std::vector<SOCKET> CA2FFTServer::clientsVector;
 std::mutex CA2FFTServer::clientsMutex;
 std::atomic<u_short> CA2FFTServer::clientNum = 0;
 
-CADataCapture* CA2FFTServer::audioCapture;
+CADataCapture* CA2FFTServer::audioCapture = NULL;
 const UINT32 CA2FFTServer::dataSize = 4096;
 const size_t CA2FFTServer::complexSize = audiofft::AudioFFT::ComplexSize(dataSize);
 
@@ -415,13 +415,21 @@ bool CA2FFTServer::Initial()
 	{
 		LOG_INFO(_T("设置监听状态成功!"));
 	}
-
+	
 	if (FAILED(audioCapture->Initial()))
 	{
 		LOG_ERROR(_T("初始化CADataCapture失败!"));
 		return false;
 	}
 	LOG_INFO(_T("初始化CADataCapture成功!"));
+
+	if (FAILED(audioCapture->ExInitial()))
+	{
+		LOG_ERROR(_T("CADataCapture::ExInitial失败!"));
+		return false;
+	}
+	LOG_INFO(_T("CADataCapture::ExInitial成功!"));
+
 	return true;
 }
 
@@ -456,6 +464,7 @@ unsigned int __stdcall CA2FFTServer::MainLoopService(PVOID pParam)
 						if (clientNum == 0)
 						{
 							audioCapture->Start();
+							audioCapture->start = true;
 						}
 						clientNum++;
 						clientsMutex.lock();
@@ -500,6 +509,7 @@ void CA2FFTServer::SendToClients(char* buffer)
 			if (clientNum == 1)
 			{
 				audioCapture->Stop();
+				audioCapture->start = false;
 			}
 			clientNum--;
 			closesocket(*itr);
@@ -554,37 +564,99 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 		//当有客户端连接时采集音频数据处理
 		if (clientNum > 0)
 		{
-			//发送缓冲区数据给所有的client
-			hr = audioCapture->get_NextPacketSize();
-			if (audioCapture->packetLength == 0)
+			if (!audioCapture->changing)
 			{
-				Sleep(INTERVAL);
-				continue;
-			}
-			hr = audioCapture->get_Buffer();
-			packRem = desPtn + (audioCapture->numFramesAvailable) - dataSize;
-			float* pfData = (float*)(audioCapture->pData);
-			if (packRem < 0)
-			{
-				for (unsigned int i = 0; i < (audioCapture->numFramesAvailable * 2); i += 2)
+				audioCapture->wait = true;
+				//发送缓冲区数据给所有的client
+				hr = audioCapture->get_NextPacketSize();
+				if (audioCapture->packetLength == 0)
 				{
-					lData.push_back(*(pfData + i));
-					rData.push_back(*(pfData + i + 1));
+					Sleep(INTERVAL);
+					continue;
 				}
-				desPtn += audioCapture->numFramesAvailable;
-				srcPtn = 0;
-			}
-			else if (packRem > 0)
-			{
-				while (TRUE)
+				hr = audioCapture->get_Buffer();
+				packRem = desPtn + (audioCapture->numFramesAvailable) - dataSize;
+				pfData = (float*)(audioCapture->pData);
+				if (packRem < 0)
 				{
-					for (unsigned int i = 0; i < (dataSize - desPtn) * 2; i += 2)
+					for (unsigned int i = 0; i < (audioCapture->numFramesAvailable * 2); i += 2)
 					{
-						lData.push_back(*(pfData + srcPtn + i));
-						rData.push_back(*(pfData + srcPtn + i + 1));
+						lData.push_back(*(pfData + i));
+						rData.push_back(*(pfData + i + 1));
 					}
-					srcPtn += dataSize - desPtn;
+					desPtn += audioCapture->numFramesAvailable;
+					srcPtn = 0;
+				}
+				else if (packRem > 0)
+				{
+					while (TRUE)
+					{
+						for (unsigned int i = 0; i < (dataSize - desPtn) * 2; i += 2)
+						{
+							lData.push_back(*(pfData + srcPtn + i));
+							rData.push_back(*(pfData + srcPtn + i + 1));
+						}
+						srcPtn += dataSize - desPtn;
+						desPtn = 0;
+						fft.fft(&lData[0], &lRe[0], &lImg[0]);
+						fft.fft(&rData[0], &rRe[0], &rImg[0]);
+						//数据压缩处理，非线性段求均值，单声道压缩至64个数据
+						j = 0;
+						for (unsigned int i = 0; i < MONOSENDLENGTH; i++)
+						{
+							lSum = 0.0;
+							rSum = 0.0;
+							while (j < DataIndex[i])
+							{
+								if (j > complexSize - 1)
+								{
+									control = false;
+									return 1;
+								}
+								//取模
+								lModel.push_back(sqrt(lRe[j] * lRe[j] + lImg[j] * lImg[j]));
+								rModel.push_back(sqrt(rRe[j] * rRe[j] + rImg[j] * rImg[j]));
+								lSum += lModel.back();
+								rSum += rModel.back();
+								j++;
+							}
+							lSendBuffer[i] = lSum / Gap[i];
+							rSendBuffer[i] = rSum / Gap[i];
+						}
+						//将压缩的数据拼凑至sendBuffer_
+						memcpy(sendBuffer, lSendBuffer, sizeof(float) * MONOSENDLENGTH);
+						memcpy((sendBuffer + MONOSENDLENGTH), rSendBuffer, sizeof(float) * MONOSENDLENGTH);
+						((CA2FFTServer*)pParam)->SendToClients((char*)sendBuffer);
+						lData.clear();
+						rData.clear();
+						lModel.clear();
+						rModel.clear();
+						if (dataSize < packRem)
+						{
+							packRem -= dataSize;
+						}
+						else
+						{
+							break;
+						}
+					}
+					for (unsigned int i = 0; i < packRem * 2; i += 2)
+					{
+						lData.push_back(*(pfData + i));
+						rData.push_back(*(pfData + i + 1));
+					}
+					desPtn += packRem;
+					srcPtn = 0;
+				}
+				else
+				{
+					for (unsigned int i = 0; i < audioCapture->numFramesAvailable * 2; i += 2)
+					{
+						lData.push_back(*(pfData + i));
+						rData.push_back(*(pfData + i + 1));
+					}
 					desPtn = 0;
+					srcPtn = 0;
 					fft.fft(&lData[0], &lRe[0], &lImg[0]);
 					fft.fft(&rData[0], &rRe[0], &rImg[0]);
 					//数据压缩处理，非线性段求均值，单声道压缩至64个数据
@@ -595,7 +667,7 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 						rSum = 0.0;
 						while (j < DataIndex[i])
 						{
-							if (j > complexSize - 1) 
+							if (j > complexSize - 1)
 							{
 								control = false;
 								return 1;
@@ -618,67 +690,14 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 					rData.clear();
 					lModel.clear();
 					rModel.clear();
-					if (dataSize < packRem)
-					{
-						packRem -= dataSize;
-					}
-					else
-					{
-						break;
-					}
 				}
-				for (unsigned int i = 0; i < packRem * 2; i += 2)
-				{
-					lData.push_back(*(pfData + i));
-					rData.push_back(*(pfData + i + 1));
-				}
-				desPtn += packRem;
-				srcPtn = 0;
+				audioCapture->ReleaseBuffer();
 			}
 			else
 			{
-				for (unsigned int i = 0; i < audioCapture->numFramesAvailable * 2; i += 2)
-				{
-					lData.push_back(*(pfData + i));
-					rData.push_back(*(pfData + i + 1));
-				}
-				desPtn = 0;
-				srcPtn = 0;
-				fft.fft(&lData[0], &lRe[0], &lImg[0]);
-				fft.fft(&rData[0], &rRe[0], &rImg[0]);
-				//数据压缩处理，非线性段求均值，单声道压缩至64个数据
-				j = 0;
-				for (unsigned int i = 0; i < MONOSENDLENGTH; i++)
-				{
-					lSum = 0.0;
-					rSum = 0.0;
-					while (j < DataIndex[i])
-					{
-						if (j > complexSize - 1)
-						{
-							control = false;
-							return 1;
-						}
-						//取模
-						lModel.push_back(sqrt(lRe[j] * lRe[j] + lImg[j] * lImg[j]));
-						rModel.push_back(sqrt(rRe[j] * rRe[j] + rImg[j] * rImg[j]));
-						lSum += lModel.back();
-						rSum += rModel.back();
-						j++;
-					}
-					lSendBuffer[i] = lSum / Gap[i];
-					rSendBuffer[i] = rSum / Gap[i];
-				}
-				//将压缩的数据拼凑至sendBuffer_
-				memcpy(sendBuffer, lSendBuffer, sizeof(float) * MONOSENDLENGTH);
-				memcpy((sendBuffer + MONOSENDLENGTH), rSendBuffer, sizeof(float) * MONOSENDLENGTH);
-				((CA2FFTServer*)pParam)->SendToClients((char*)sendBuffer);
-				lData.clear();
-				rData.clear();
-				lModel.clear();
-				rModel.clear();
+				audioCapture->wait = false;
+				Sleep(INTERVAL);
 			}
-			audioCapture->ReleaseBuffer();
 		}
 		else
 		{

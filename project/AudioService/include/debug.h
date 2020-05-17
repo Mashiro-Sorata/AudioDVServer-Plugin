@@ -14,6 +14,10 @@
 #ifdef DEBUG_SWITCH
 #include<iostream>
 
+void Debug_Var(const char* name, long data);
+void Debug_Var(const char* name, char* data);
+void Debug_Var(const char* name, std::string data);
+
 //”√NERvLogInfo ‰≥ˆ
 #define NER_OUT
 
@@ -23,10 +27,6 @@
 
 #include <NERvGear/NERvSDK.h>
 #include "../include/defs.h"
-
-void Debug_Var(char* name, long data);
-void Debug_Var(char* name, char* data);
-void Debug_Var(char* name, std::string str);
 
 #define LOG_INFO(format, ...) NERvGear::NERvLogInfo(NVG_TEXT(NAME_STRING), format)
 
@@ -39,6 +39,7 @@ void Debug_Var(char* name, std::string str);
 #define LOG_DEBUG_VAR(name, format, ...) Debug_Var(name, format)
 
 #else
+
 
 #define _T(x) x
 

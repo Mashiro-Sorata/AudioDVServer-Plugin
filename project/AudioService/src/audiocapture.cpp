@@ -1,14 +1,22 @@
-#include "../include/audiocapture.h"
+#include "audiocapture.h"
 
 
-CADataCapture::CADataCapture()
+CADataCapture::CADataCapture() : IMMNotificationClient()
 {
-	pEnumerator = NULL;
-	pDevice = NULL;
 	pAudioClient = NULL;
 	pCaptureClient = NULL;
+	pEnumerator = NULL;
+	pDevice = NULL;
 	pwfx = NULL;
 	pData = NULL;
+	numFramesAvailable = 0;
+	packetLength = 0;
+	pData = NULL;
+	flags = 0;
+	changing = false;
+	start = false;
+	wait = false;
+	role_ = ERole_enum_count;
 }
 
 CADataCapture::~CADataCapture()
@@ -19,10 +27,12 @@ CADataCapture::~CADataCapture()
 	if (pAudioClient != NULL) pAudioClient->Release();
 	if (pCaptureClient != NULL) pCaptureClient->Release();
 	CoUninitialize();
+	pEnumerator->UnregisterEndpointNotificationCallback(this);
 }
 
 HRESULT CADataCapture::Initial()
 {
+
 	HRESULT hr;
 	hr = CoInitialize(NULL);
 	if (FAILED(hr)) {
@@ -35,7 +45,13 @@ HRESULT CADataCapture::Initial()
 		LOG_ERROR(_T("Faild to CoCreateInstance"));
 		return hr;
 	}
+	pEnumerator->RegisterEndpointNotificationCallback(this);
+	return S_OK;
+}
 
+HRESULT CADataCapture::ExInitial()
+{
+	HRESULT hr;
 	// get default output audio endpoint
 	hr = pEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &pDevice);
 	if (FAILED(hr)) {
@@ -79,17 +95,17 @@ HRESULT CADataCapture::Initial()
 	return S_OK;
 }
 
+
 HRESULT CADataCapture::Start()
 {
-	HRESULT hr;
-	hr = pAudioClient->Start();
-	
+	HRESULT hr = pAudioClient->Start();
+
 	if (FAILED(hr))
 	{
 		LOG_ERROR(_T("Failed to Start"));
 		return hr;
 	}
-	CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	
 	return hr;
 }
 
@@ -125,4 +141,98 @@ HRESULT CADataCapture::ReleaseBuffer()
 	return hr;
 }
 
+HRESULT STDMETHODCALLTYPE CADataCapture::QueryInterface(REFIID riid, void** ppvObject)
+{
+	if (riid == __uuidof(IUnknown))
+	{
+		AddRef();
+		*ppvObject = static_cast<IUnknown*>(this);
+	}
+	else if (riid == __uuidof(IMMNotificationClient))
+	{
+		AddRef();
+		*ppvObject = static_cast<IMMNotificationClient*>(this);
+	}
+	else
+	{
+		*ppvObject = nullptr;
+		return E_NOINTERFACE;
+	}
 
+	return S_OK;
+}
+
+ULONG STDMETHODCALLTYPE CADataCapture::AddRef(void)
+{
+	return InterlockedIncrement(&mReferenceCount);
+}
+
+ULONG STDMETHODCALLTYPE CADataCapture::Release(void)
+{
+	auto count = InterlockedDecrement(&mReferenceCount);
+	if (count == 0)
+	{
+		delete this;
+	}
+	return count;
+}
+
+HRESULT STDMETHODCALLTYPE CADataCapture::OnDefaultDeviceChanged(
+	_In_ EDataFlow flow,
+	_In_ ERole role,
+	_In_ LPCWSTR pwstrDefaultDeviceId
+)
+{
+	if (!pEnumerator)
+	{
+		return S_OK;
+	}
+	if (role_ == ERole_enum_count)
+	{
+		role_ = role;
+	}
+	else
+	{
+		if (role_ != role)
+			return S_OK;
+	}
+	changing = true;
+	while (wait)
+	{
+		Sleep(1);
+	}
+	pAudioClient->Stop();
+	pAudioClient->Release();
+	CoTaskMemFree(pwfx);
+	pDevice->Release();
+	LOG_INFO(_T("Device Changed!"));
+
+	pEnumerator->GetDevice(pwstrDefaultDeviceId, &pDevice);
+	ExInitial();
+	if (start)
+	{
+		Start();
+	}
+	changing = false;
+	return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE CADataCapture::OnDeviceStateChanged(_In_  LPCWSTR pwstrDeviceId, _In_  DWORD dwNewState)
+{
+	return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE CADataCapture::OnDeviceAdded(_In_  LPCWSTR pwstrDeviceId)
+{
+	return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE CADataCapture::OnDeviceRemoved(_In_  LPCWSTR pwstrDeviceId)
+{
+	return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE CADataCapture::OnPropertyValueChanged(_In_  LPCWSTR pwstrDeviceId, _In_  const PROPERTYKEY key)
+{
+	return S_OK;
+}

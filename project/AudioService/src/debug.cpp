@@ -1,7 +1,8 @@
 #include <Windows.h>
-#include "../include/debug.h"
+#include "debug.h"
 
 
+#ifdef NER_OUT
 
 static void String2TCHAR(const std::string _str, TCHAR* tchar)
 {
@@ -9,7 +10,7 @@ static void String2TCHAR(const std::string _str, TCHAR* tchar)
 }
 
 
-void Debug_Var(char* name, long data)
+void Debug_Var(const char* name, long data)
 {
 	char sdata[22];
 	_itoa_s(data, sdata, 10);
@@ -21,7 +22,7 @@ void Debug_Var(char* name, long data)
 	LOG_DEBUG(_tchar);
 }
 
-void Debug_Var(char* name, char* data)
+void Debug_Var(const char* name, char* data)
 {
 	std::string _str = name;
 	_str.append(": ");
@@ -31,12 +32,32 @@ void Debug_Var(char* name, char* data)
 	LOG_DEBUG(_tchar);
 }
 
-void Debug_Var(char* name, std::string str)
+void Debug_Var(const char* name, std::string data)
 {
 	std::string _str = name;
 	_str.append(": ");
-	_str.append(str);
+	_str.append(data);
 	TCHAR _tchar[256];
-	String2TCHAR(str, _tchar);
+	String2TCHAR(data, _tchar);
 	LOG_DEBUG(_tchar);
 }
+
+#else
+
+void Debug_Var(const char* name, long data)
+{
+	std::cout << name << ": " << data << std::endl;
+}
+
+void Debug_Var(const char* name, char* data)
+{
+	std::cout << name << ": " << data << std::endl;
+}
+
+void Debug_Var(const char* name, std::string data)
+{
+	std::cout << name << ": " << data << std::endl;
+}
+
+
+#endif // NER_OUT
