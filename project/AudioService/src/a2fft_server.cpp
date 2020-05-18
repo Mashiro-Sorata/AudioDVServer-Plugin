@@ -297,13 +297,13 @@ std::vector<SOCKET> CA2FFTServer::clientsVector;
 std::mutex CA2FFTServer::clientsMutex;
 std::atomic<u_short> CA2FFTServer::clientNum = 0;
 
-CADataCapture* CA2FFTServer::audioCapture = NULL;
+CADataCapture* CA2FFTServer::audioCapture = new CADataCapture();
 const UINT32 CA2FFTServer::dataSize = 4096;
 const size_t CA2FFTServer::complexSize = audiofft::AudioFFT::ComplexSize(dataSize);
 
-float* CA2FFTServer::sendBuffer = NULL;
-float* CA2FFTServer::lSendBuffer = NULL;
-float* CA2FFTServer::rSendBuffer = NULL;
+float* CA2FFTServer::sendBuffer = new float[SENDLENGTH];
+float* CA2FFTServer::lSendBuffer = new float[MONOSENDLENGTH];
+float* CA2FFTServer::rSendBuffer = new float[MONOSENDLENGTH];
 
 
 CA2FFTServer::CA2FFTServer(const char* ip, u_short port, int maxClients)
@@ -313,11 +313,7 @@ CA2FFTServer::CA2FFTServer(const char* ip, u_short port, int maxClients)
 	maxClients_ = (maxClients < 1) ? DEFAULT_MAXCLIENTS : maxClients;
 	socketServer_ = NULL;
 	mainLoopServiceID_ = NULL;
-	sendBuffer = new float[SENDLENGTH];
-	lSendBuffer = new float[MONOSENDLENGTH];
-	rSendBuffer = new float[MONOSENDLENGTH];
 	clientsVector.reserve(maxClients_);
-	audioCapture = new CADataCapture();
 
 	socketServer_ = NULL;
 	//填充服务端信息
@@ -338,11 +334,7 @@ CA2FFTServer::CA2FFTServer()
 	maxClients_ = DEFAULT_MAXCLIENTS;
 	socketServer_ = NULL;
 	mainLoopServiceID_ = NULL;
-	sendBuffer = new float[SENDLENGTH];
-	lSendBuffer = new float[MONOSENDLENGTH];
-	rSendBuffer = new float[MONOSENDLENGTH];
 	clientsVector.reserve(maxClients_);
-	audioCapture = new CADataCapture();
 
 	socketServer_ = NULL;
 	//填充服务端信息
@@ -579,9 +571,9 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 		//当有客户端连接时采集音频数据处理
 		if (clientNum > 0)
 		{
-			if (!audioCapture->changing)
+			if (!audioCapture->IsChanging())
 			{
-				audioCapture->wait = true;
+				audioCapture->WaitBegin();
 				//发送缓冲区数据给所有的client
 				hr = audioCapture->get_NextPacketSize();
 				if (audioCapture->packetLength == 0)
@@ -710,7 +702,7 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 			}
 			else
 			{
-				audioCapture->wait = false;
+				audioCapture->WaitEnd();
 				Sleep(INTERVAL);
 			}
 		}

@@ -13,9 +13,9 @@ CADataCapture::CADataCapture() : IMMNotificationClient()
 	packetLength = 0;
 	pData = NULL;
 	flags = 0;
-	changing = false;
+	changing_ = false;
 	start_ = false;
-	wait = false;
+	wait_ = false;
 	role_ = ERole_enum_count;
 }
 
@@ -140,6 +140,21 @@ HRESULT CADataCapture::ReleaseBuffer()
 	return hr;
 }
 
+void CADataCapture::WaitBegin()
+{
+	wait_ = true;
+}
+
+void CADataCapture::WaitEnd()
+{
+	wait_ = false;
+}
+
+bool CADataCapture::IsChanging()
+{
+	return changing_;
+}
+
 HRESULT STDMETHODCALLTYPE CADataCapture::QueryInterface(REFIID riid, void** ppvObject)
 {
 	if (riid == __uuidof(IUnknown))
@@ -195,8 +210,9 @@ HRESULT STDMETHODCALLTYPE CADataCapture::OnDefaultDeviceChanged(
 		if (role_ != role)
 			return S_OK;
 	}
-	changing = true;
-	while (wait)
+	LOG_INFO(_T("Device Changed!"));
+	changing_ = true;
+	while (wait_)
 	{
 		Sleep(1);
 	}
@@ -204,7 +220,6 @@ HRESULT STDMETHODCALLTYPE CADataCapture::OnDefaultDeviceChanged(
 	pAudioClient->Release();
 	CoTaskMemFree(pwfx);
 	pDevice->Release();
-	LOG_INFO(_T("Device Changed!"));
 
 	pEnumerator->GetDevice(pwstrDefaultDeviceId, &pDevice);
 	ExInitial();
@@ -212,7 +227,7 @@ HRESULT STDMETHODCALLTYPE CADataCapture::OnDefaultDeviceChanged(
 	{
 		Start();
 	}
-	changing = false;
+	changing_ = false;
 	return S_OK;
 }
 

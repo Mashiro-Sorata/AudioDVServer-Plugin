@@ -25,16 +25,14 @@ public:
 	HRESULT get_NextPacketSize();
 	HRESULT get_Buffer();
 	HRESULT ReleaseBuffer();
+	void WaitBegin();
+	void WaitEnd();
+	bool IsChanging();
 
 	UINT32 numFramesAvailable;
 	UINT32 packetLength;
 	BYTE* pData;
 	DWORD flags;
-
-	//当默认设备改变重新设置的过程中changing为true
-	bool changing;
-	//主应用在使用pCaptureClient时将wait置为true
-	bool wait;
 
 public:
 	// IUnknown
@@ -64,8 +62,13 @@ private:
 	WAVEFORMATEX* pwfx;
 
 	ERole role_;
+
 	//主应用处于开始状态时将start置为true
 	bool start_;
+	//主应用在使用pCaptureClient时将wait置为true
+	bool wait_;
+	//当默认设备改变重新设置的过程中changing为true
+	bool changing_;
 };
 
 #endif // !AUDIOCAPTURE_H
