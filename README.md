@@ -73,6 +73,7 @@ maxClient = 4
 ---
 
 <h2 id="u5">开发接口/API</h2>
+
 `ADV_Client`文件夹内的`adv.js`封装了一个`ADV_Plugin`类，并提供了一个`ondata()`接口方便数据的引用。
 
 引用方法：
