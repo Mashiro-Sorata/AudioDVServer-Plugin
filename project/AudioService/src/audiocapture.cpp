@@ -14,7 +14,7 @@ CADataCapture::CADataCapture() : IMMNotificationClient()
 	pData = NULL;
 	flags = 0;
 	changing = false;
-	start = false;
+	start_ = false;
 	wait = false;
 	role_ = ERole_enum_count;
 }
@@ -99,24 +99,23 @@ HRESULT CADataCapture::ExInitial()
 HRESULT CADataCapture::Start()
 {
 	HRESULT hr = pAudioClient->Start();
-
 	if (FAILED(hr))
 	{
 		LOG_ERROR(_T("Failed to Start"));
 		return hr;
 	}
-	
+	start_ = true;
 	return hr;
 }
 
 HRESULT CADataCapture::Stop()
 {
-	HRESULT hr;
-	hr = pAudioClient->Stop();
+	 HRESULT hr = pAudioClient->Stop();
 	if (FAILED(hr))
 	{
 		LOG_ERROR(_T("Failed to Stop"));
 	}
+	start_ = false;
 	return hr;
 }
 
@@ -209,7 +208,7 @@ HRESULT STDMETHODCALLTYPE CADataCapture::OnDefaultDeviceChanged(
 
 	pEnumerator->GetDevice(pwstrDefaultDeviceId, &pDevice);
 	ExInitial();
-	if (start)
+	if (start_)
 	{
 		Start();
 	}

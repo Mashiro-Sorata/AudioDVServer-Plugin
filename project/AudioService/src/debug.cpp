@@ -2,6 +2,8 @@
 #include "debug.h"
 
 
+#ifdef DEBUG_SWITCH
+
 #ifdef NER_OUT
 
 static void String2TCHAR(const std::string _str, TCHAR* tchar)
@@ -61,3 +63,5 @@ void Debug_Var(const char* name, std::string data)
 
 
 #endif // NER_OUT
+
+#endif // DEBUG_SWITCH

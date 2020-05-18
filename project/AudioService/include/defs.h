@@ -12,7 +12,7 @@
 #define COMMENT_STRING _TRANSLATE("The SAO Utils Plug-in by Mashiro_Sorata\nProject: https://github.com/Mashiro-Sorata/ADV-Plugin\n")
 
 #define VER_MAJOR    1
-#define VER_MINOR    0
+#define VER_MINOR    1
 #define VER_SUBMINOR 0
 #define VER_RESERVED 0
 

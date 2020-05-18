@@ -184,7 +184,7 @@ static bool wsEncodeFrame(std::string inMessage, std::string& outFrame, enum WS_
 
 	// 填充数据  
 	uint32_t frameSize = frameHeaderSize + messageLength;
-	char* frame = new char[frameSize + 1];
+	char* frame = new char[reinterpret_cast<uint64_t>(&frameSize) + 1];
 	memcpy(frame, frameHeader, frameHeaderSize);
 	memcpy(frame + frameHeaderSize, inMessage.c_str(), messageLength);
 	outFrame = std::string(frame, frameSize);
@@ -228,7 +228,7 @@ static char* wsEncodeFrameBytes(char* inMessage, enum WS_FrameType frameType, ui
 
 	// 填充数据  
 	uint32_t frameSize = frameHeaderSize + messageLength;
-	char* frame = new char[frameSize + 1];
+	char* frame = new char[reinterpret_cast<uint64_t>(&frameSize) + 1];
 	memcpy(frame, frameHeader, frameHeaderSize);
 	memcpy(frame + frameHeaderSize, inMessage, messageLength);
 	*length = frameSize;
@@ -317,8 +317,18 @@ CA2FFTServer::CA2FFTServer(const char* ip, u_short port, int maxClients)
 	lSendBuffer = new float[MONOSENDLENGTH];
 	rSendBuffer = new float[MONOSENDLENGTH];
 	clientsVector.reserve(maxClients_);
-
 	audioCapture = new CADataCapture();
+
+	socketServer_ = NULL;
+	//填充服务端信息
+	serverAddr_.sin_family = AF_INET;
+	serverAddr_.sin_addr.S_un.S_addr = ip_;
+	serverAddr_.sin_port = port_;
+
+	mainLoopServiceHandle_ = NULL;
+	mainLoopServiceID_ = 0;
+	bufferSenderServiceHandle_ = NULL;
+	bufferSenderServiceID_ = 0;
 }
 
 CA2FFTServer::CA2FFTServer()
@@ -332,8 +342,18 @@ CA2FFTServer::CA2FFTServer()
 	lSendBuffer = new float[MONOSENDLENGTH];
 	rSendBuffer = new float[MONOSENDLENGTH];
 	clientsVector.reserve(maxClients_);
-
 	audioCapture = new CADataCapture();
+
+	socketServer_ = NULL;
+	//填充服务端信息
+	serverAddr_.sin_family = AF_INET;
+	serverAddr_.sin_addr.S_un.S_addr = ip_;
+	serverAddr_.sin_port = port_;
+
+	mainLoopServiceHandle_ = NULL;
+	mainLoopServiceID_ = 0;
+	bufferSenderServiceHandle_ = NULL;
+	bufferSenderServiceID_ = 0;
 }
 
 CA2FFTServer::~CA2FFTServer()
@@ -381,18 +401,15 @@ bool CA2FFTServer::Initial()
 	{
 		LOG_INFO(_T("套接字库版本正确!"));
 	}
-	//填充服务端信息
-	serverAddr_.sin_family = AF_INET;
-	serverAddr_.sin_addr.S_un.S_addr = ip_;
-	serverAddr_.sin_port = port_;
+	
 	//创建套接字
 	socketServer_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	//接受连接请求
 
 	BOOL bReUseAddr = TRUE;
 	setsockopt(socketServer_, SOL_SOCKET, SO_REUSEADDR, (const char*)&bReUseAddr, sizeof(BOOL));
 	BOOL  bDontLinger = FALSE;
 	setsockopt(socketServer_, SOL_SOCKET, SO_DONTLINGER, (const char*)&bDontLinger, sizeof(BOOL));
+
 	if (bind(socketServer_, (SOCKADDR*)&serverAddr_, sizeof(SOCKADDR)) == SOCKET_ERROR)
 	{
 		LOG_ERROR(_T("套接字绑定失败!"));
@@ -464,7 +481,6 @@ unsigned int __stdcall CA2FFTServer::MainLoopService(PVOID pParam)
 						if (clientNum == 0)
 						{
 							audioCapture->Start();
-							audioCapture->start = true;
 						}
 						clientNum++;
 						clientsMutex.lock();
@@ -509,7 +525,6 @@ void CA2FFTServer::SendToClients(char* buffer)
 			if (clientNum == 1)
 			{
 				audioCapture->Stop();
-				audioCapture->start = false;
 			}
 			clientNum--;
 			closesocket(*itr);

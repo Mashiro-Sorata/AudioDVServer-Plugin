@@ -33,8 +33,6 @@ public:
 
 	//当默认设备改变重新设置的过程中changing为true
 	bool changing;
-	//主应用处于开始状态时将start置为true
-	bool start;
 	//主应用在使用pCaptureClient时将wait置为true
 	bool wait;
 
@@ -66,6 +64,8 @@ private:
 	WAVEFORMATEX* pwfx;
 
 	ERole role_;
+	//主应用处于开始状态时将start置为true
+	bool start_;
 };
 
 #endif // !AUDIOCAPTURE_H

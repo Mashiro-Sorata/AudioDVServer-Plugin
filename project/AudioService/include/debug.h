@@ -3,13 +3,13 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
-
-//测试日志开关
-#define DEBUG_SWITCH
-
 //转为宽字符
 #define __T_(x) L ## x
 #define __T(x) __T_(x)
+
+//测试日志开关
+//#define DEBUG_SWITCH
+
 
 #ifdef DEBUG_SWITCH
 #include<iostream>
