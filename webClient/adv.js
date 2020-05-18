@@ -11,7 +11,7 @@ var ADV_Plugin = (function(){
     function _adv_plugin(ip, port) {
         var _this = this;
         if(_this instanceof _adv_plugin) {
-            if("ANY" == ip) {
+            if("ANY" == ip || "any" == ip) {
                 _this.address = "ws://0.0.0.0:" + port;
             } 
             else {
