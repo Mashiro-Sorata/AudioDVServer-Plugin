@@ -65,6 +65,7 @@ NVG_NO_COMPONENT_REGISTER(CAudioDVServer)
 
 long CAudioDVServer::OnInitial()
 {
+    LOG_INIT();
     LOG_INFO(_T("Initial CAudioDVServer!"));
     srv_ip = new char[17];
     ReadConfig(&srv_ip, &srv_port, &srv_maxconn);

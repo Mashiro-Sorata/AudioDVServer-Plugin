@@ -35,6 +35,7 @@ namespace debug
 	public:
 		Logger(LOGTYPE type);
 		~Logger();
+		void Initial();
 		void Log_Info(const char* _FILE, const char* _func, const char* format);
 		void Log_Debug(const char* _FILE, const char* _func, const char* format);
 		void Log_Warn(const char* _FILE, const char* _func, const char* format);
@@ -96,6 +97,7 @@ namespace debug
 	extern Logger LOGGER;
 }
 
+#define LOG_INIT() debug::LOGGER.Initial()
 #define LOG_INFO(format) debug::LOGGER.Log_Info(__FILE__, __func__, format)
 #define LOG_DEBUG(format) debug::LOGGER.Log_Debug(__FILE__, __func__, format)
 #define LOG_WARN(format) debug::LOGGER.Log_Warn(__FILE__, __func__, format)
@@ -104,14 +106,11 @@ namespace debug
 
 #else
 
+#define LOG_INIT()
 #define LOG_INFO(format, ...)
-
 #define LOG_DEBUG(format, ...)
-
 #define LOG_WARN(format, ...)
-
 #define LOG_ERROR(format, ...)
-
 #define LOG_BASE(name, format)
 
 #endif // !DEBUG_SWITCH

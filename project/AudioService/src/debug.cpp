@@ -46,6 +46,20 @@ const debug::LEVEL debug::Logger::maxLevel = debug::DEBUGLEVEL;
 debug::Logger::Logger(LOGTYPE type)
 {
 	type_ = type;
+}
+
+debug::Logger::~Logger()
+{
+	if (NULL != outfile_)
+	{
+		outfile_->close();
+		delete outfile_;
+		outfile_ = NULL;
+	}
+}
+
+void debug::Logger::Initial()
+{
 	if (type_ == LOGTYPE::T_FILE)
 	{
 		std::string _dirPath;
@@ -57,16 +71,6 @@ debug::Logger::Logger(LOGTYPE type)
 	}
 	else
 	{
-		outfile_ = NULL;
-	}
-}
-
-debug::Logger::~Logger()
-{
-	if (NULL != outfile_)
-	{
-		outfile_->close();
-		delete outfile_;
 		outfile_ = NULL;
 	}
 }
