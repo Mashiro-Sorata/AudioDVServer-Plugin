@@ -3,43 +3,6 @@
 #include "../include/debug.h"
 
 
-static HMODULE GetSelfModuleHandle()
-{
-    MEMORY_BASIC_INFORMATION mbi;
-    return ((::VirtualQuery(GetSelfModuleHandle, &mbi, sizeof(mbi)) != 0) ? 
-                                        (HMODULE)mbi.AllocationBase : NULL);
-}
-
-static void TCHAR2Char(const TCHAR* tchar, char* _char)
-{
-    //获取字节长度   
-    int iLength;
-    iLength = WideCharToMultiByte(CP_ACP, 0, tchar, -1, NULL, 0, NULL, NULL);
-    //将tchar值赋给_char
-    WideCharToMultiByte(CP_ACP, 0, tchar, -1, _char, iLength, NULL, NULL);
-}
-
-static void String2TCHAR(const std::string _str, TCHAR* tchar)
-{
-    MultiByteToWideChar(CP_ACP, 0, (LPCSTR)_str.c_str(), -1, tchar, 256);
-}
-
-static void GetInstanceFolderPath(std::string* dirPath)
-{
-    std::string exePath = "";
-    TCHAR tcFullPath[MAX_PATH];
-    char pChPath[MAX_PATH];
-    memset(pChPath, '\0', MAX_PATH);
-    /* 获取当前dll的执行路径exe路径 */
-    GetModuleFileName(GetSelfModuleHandle(), tcFullPath, MAX_PATH);
-    /** 将tchar转为char */
-    TCHAR2Char(tcFullPath, pChPath);
-    exePath = std::string(pChPath);
-    size_t iPos = exePath.rfind("\\");
-    *dirPath = exePath.substr(0, iPos+1);
-}
-
-
 void ReadConfig(char** _ip, unsigned short* _port, int* _maxClient)
 {
     LOG_INFO(_T("读取配置文件..."));
@@ -52,8 +15,8 @@ void ReadConfig(char** _ip, unsigned short* _port, int* _maxClient)
     TCHAR w_ip[17];
     char c_ip[17];
     String2TCHAR(dirPath + CONFIGFILE, wdirPath);
-    GetPrivateProfileString(__T("server"), __T("ip"), __T(DEFAULT_IP_LOCAL), w_ip, 17, wdirPath);
-    if (!lstrcmp(__T("ANY"),w_ip))
+    GetPrivateProfileString(NVG_TEXT("server"), NVG_TEXT("ip"), NVG_TEXT(DEFAULT_IP_LOCAL), w_ip, 17, wdirPath);
+    if (!lstrcmp(NVG_TEXT("ANY"),w_ip))
     {
         LOG_DEBUG(_T("INADDR_ANY"));
         strcpy(*_ip, DEFAULT_IP_ANY);
@@ -63,7 +26,7 @@ void ReadConfig(char** _ip, unsigned short* _port, int* _maxClient)
         LOG_DEBUG(_T("INADDR_LOCAL"));
         strcpy(*_ip, DEFAULT_IP_LOCAL);
     }
-    *_port = GetPrivateProfileInt(__T("server"), __T("port"), DEFAULT_PORT, wdirPath);
-    *_maxClient = GetPrivateProfileInt(__T("server"), __T("maxclient"), DEFAULT_MAXCLIENTS, wdirPath);
+    *_port = GetPrivateProfileInt(NVG_TEXT("server"), NVG_TEXT("port"), DEFAULT_PORT, wdirPath);
+    *_maxClient = GetPrivateProfileInt(NVG_TEXT("server"), NVG_TEXT("maxclient"), DEFAULT_MAXCLIENTS, wdirPath);
 }
 
