@@ -48,6 +48,16 @@ const std::string debug::Logger::FILENAME = "ADV_Log.log";
 
 const debug::LEVEL debug::Logger::maxLevel = debug::DEBUGLEVEL;
 
+debug::Logger::Logger()
+{
+	flag_ = false;
+#if LOGGER_TYPE==LOGGER_TYPE_FILE
+
+	outfile_ = NULL;
+
+#endif
+}
+
 debug::Logger::~Logger()
 {
 #if LOGGER_TYPE==LOGGER_TYPE_FILE
@@ -62,15 +72,19 @@ debug::Logger::~Logger()
 #endif
 }
 
-void debug::Logger::Initial()
+void debug::Logger::Initial(bool flag)
 {
+	flag_ = flag;
 #if LOGGER_TYPE==LOGGER_TYPE_FILE
-	std::string _dirPath;
-	GetInstanceFolderPath(&_dirPath);
-	_dirPath += FILENAME;
-	std::ofstream _temp(_dirPath, std::ios::out);
-	_temp.close();
-	outfile_ = new std::ofstream(_dirPath, std::ios::app);
+	if (flag_)
+	{
+		std::string _dirPath;
+		GetInstanceFolderPath(&_dirPath);
+		_dirPath += FILENAME;
+		std::ofstream _temp(_dirPath, std::ios::out);
+		_temp.close();
+		outfile_ = new std::ofstream(_dirPath, std::ios::app);
+	}
 #endif
 }
 

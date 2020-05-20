@@ -5,7 +5,7 @@
 
 #define CONFIGFILE "advConfig.ini"
 
-void ReadConfig(char** _ip, unsigned short* _port, int* _maxconn);
+void ReadConfig(char** _ip, unsigned short* _port, int* _maxClient, bool* _logger);
 
 
 #endif // !CONFIG_H

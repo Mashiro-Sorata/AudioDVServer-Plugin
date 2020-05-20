@@ -152,47 +152,6 @@ static bool wsDecodeFrame(WebSocketStreamHeader* header, char cbSrcData[], unsig
 }
 
 //3.组装server发给client协议
-static bool wsEncodeFrame(std::string inMessage, std::string& outFrame, enum WS_FrameType frameType)
-{
-	const uint32_t messageLength = inMessage.size();
-	if (messageLength > 32767)
-	{
-		// 暂不支持这么长的数据  
-		return false;
-	}
-
-	uint8_t payloadFieldExtraBytes = (messageLength <= 0x7d) ? 0 : 2;
-	// header: 2字节, mask位设置为0(不加密), 则后面的masking key无须填写, 省略4字节  
-	uint8_t frameHeaderSize = 2 + payloadFieldExtraBytes;
-	uint8_t* frameHeader = new uint8_t[frameHeaderSize];
-	memset(frameHeader, 0, frameHeaderSize);
-
-	// fin位为1, 扩展位为0, 操作位为frameType  
-	frameHeader[0] = static_cast<uint8_t>(0x80 | frameType);
-
-	// 填充数据长度
-	if (messageLength <= 0x7d)
-	{
-		frameHeader[1] = static_cast<uint8_t>(messageLength);
-	}
-	else
-	{
-		frameHeader[1] = 0x7e;
-		uint16_t len = htons(messageLength);
-		memcpy(&frameHeader[2], &len, payloadFieldExtraBytes);
-	}
-
-	// 填充数据  
-	uint32_t frameSize = frameHeaderSize + messageLength;
-	char* frame = new char[reinterpret_cast<uint64_t>(&frameSize) + 1];
-	memcpy(frame, frameHeader, frameHeaderSize);
-	memcpy(frame + frameHeaderSize, inMessage.c_str(), messageLength);
-	outFrame = std::string(frame, frameSize);
-	delete[] frame;
-	delete[] frameHeader;
-	return true;
-}
-
 static char* wsEncodeFrameBytes(char* inMessage, enum WS_FrameType frameType, uint32_t* length)
 {
 	uint32_t messageLength;
@@ -210,7 +169,6 @@ static char* wsEncodeFrameBytes(char* inMessage, enum WS_FrameType frameType, ui
 	uint8_t frameHeaderSize = 2 + payloadFieldExtraBytes;
 	uint8_t* frameHeader = new uint8_t[frameHeaderSize];
 	memset(frameHeader, 0, frameHeaderSize);
-
 	// fin位为1, 扩展位为0, 操作位为frameType  
 	frameHeader[0] = static_cast<uint8_t>(0x80 | frameType);
 
@@ -227,10 +185,11 @@ static char* wsEncodeFrameBytes(char* inMessage, enum WS_FrameType frameType, ui
 	}
 
 	// 填充数据  
-	uint32_t frameSize = frameHeaderSize + messageLength;
-	char* frame = new char[reinterpret_cast<uint64_t>(&frameSize) + 1];
+	uint64_t frameSize = static_cast<uint64_t>(frameHeaderSize) + static_cast<uint64_t>(messageLength);
+	char* frame = new char[frameSize + 1];
 	memcpy(frame, frameHeader, frameHeaderSize);
 	memcpy(frame + frameHeaderSize, inMessage, messageLength);
+
 	*length = frameSize;
 	delete[] frameHeader;
 	return frame;
@@ -261,6 +220,7 @@ static int wsSend(SOCKET client, char* data, uint32_t len)
 	char* psend;
 	if (SOCKET_ERROR != client)
 	{
+
 		if (len == 0)
 		{
 			length = strlen(data);
@@ -357,7 +317,7 @@ CA2FFTServer::~CA2FFTServer()
 	clientsMutex.unlock();
 	//关闭套接字
 	closesocket(socketServer_);
-	
+
 	delete[] sendBuffer;
 	delete[] lSendBuffer;
 	delete[] rSendBuffer;
@@ -393,7 +353,7 @@ bool CA2FFTServer::Initial()
 	{
 		LOG_INFO(_T("套接字库版本正确!"));
 	}
-	
+
 	//创建套接字
 	socketServer_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
@@ -424,7 +384,7 @@ bool CA2FFTServer::Initial()
 	{
 		LOG_INFO(_T("设置监听状态成功!"));
 	}
-	
+
 	if (FAILED(audioCapture->Initial()))
 	{
 		LOG_ERROR(_T("初始化CADataCapture失败!"));
@@ -563,7 +523,7 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 	unsigned int j = 0;
 	float lSum = 0.0;
 	float rSum = 0.0;
-	
+
 	//循环更新数据后发送的操作
 	HRESULT hr;
 	while (control)
@@ -717,7 +677,7 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 bool CA2FFTServer::StartBufferSenderService()
 {
 	bufferSenderServiceHandle_ = (HANDLE)_beginthreadex(NULL, 0, BufferSenderService,
-														this, 0, &bufferSenderServiceID_);
+		this, 0, &bufferSenderServiceID_);
 	return (NULL != bufferSenderServiceHandle_) ? true : false;
 }
 

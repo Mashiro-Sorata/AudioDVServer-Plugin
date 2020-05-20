@@ -32,6 +32,7 @@ CA2FFTServer* audioServer;
 char* srv_ip;
 u_short srv_port = 5050;
 int srv_maxconn = 5;
+bool srv_logger = false;
 
 /// ----------------------------------------------------------------------------
 /// plug-in declaration
@@ -65,20 +66,20 @@ NVG_NO_COMPONENT_REGISTER(CAudioDVServer)
 
 long CAudioDVServer::OnInitial()
 {
-    LOG_INIT();
-    LOG_INFO(_T("Initial CAudioDVServer!"));
     srv_ip = new char[17];
-    ReadConfig(&srv_ip, &srv_port, &srv_maxconn);
+    ReadConfig(&srv_ip, &srv_port, &srv_maxconn, &srv_logger);
+    LOG_INIT(srv_logger);
+    LOG_INFO(_T("Initial CAudioDVServer!"));
     audioServer = new CA2FFTServer(srv_ip, srv_port, srv_maxconn);
     return PluginImpl::OnInitial();
 }
 
 long CAudioDVServer::OnRelease()
 {
-    LOG_INFO(_T("Exit CAudioDVServer!"));
     audioServer->ExitServer();
     delete[] srv_ip;
     delete audioServer;
+    LOG_INFO(_T("Exit CAudioDVServer!"));
     return PluginImpl::OnRelease();
 }
 

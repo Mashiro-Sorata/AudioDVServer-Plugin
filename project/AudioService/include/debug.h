@@ -9,11 +9,6 @@
 #define _T(x) x
 
 
-
-
-
-
-
 void String2TCHAR(const std::string _str, TCHAR* tchar);
 void GetInstanceFolderPath(std::string* dirPath);
 
@@ -45,7 +40,7 @@ void GetInstanceFolderPath(std::string* dirPath);
 
 namespace debug
 {
-	enum class LEVEL { _INFO_ = 0, _DEBUG_ = 1, _WARN_ = 2, _ERROR_ = 3, _ALL_ = 4 };
+	enum class LEVEL { _ERROR_ = 0, _WARN_ = 1, _INFO_ = 2, _DEBUG_ = 3, _ALL_ = 4 };
 
 	//控制输出等级
 	const debug::LEVEL DEBUGLEVEL(LEVEL::_ALL_);
@@ -53,8 +48,9 @@ namespace debug
 	class Logger
 	{
 	public:
+		Logger();
 		~Logger();
-		void Initial();
+		void Initial(bool flag);
 		void Log_Info(const char* _FILE, const char* _func, const char* format);
 		void Log_Debug(const char* _FILE, const char* _func, const char* format);
 		void Log_Warn(const char* _FILE, const char* _func, const char* format);
@@ -78,6 +74,7 @@ namespace debug
 		std::ofstream* outfile_;
 
 #endif
+		bool flag_;
 		static const LEVEL maxLevel;
 		SYSTEMTIME now_;
 	};
@@ -85,44 +82,48 @@ namespace debug
 	template<typename T>
 	void Logger::Log_Base(const char* _FILE, const char* _func, LEVEL level, const char* name, T format)
 	{
-		GetLocalTime(&now_);
-		char sdata[5];
-		std::string _headLog;
-		_headLog.append("<");
-		_itoa_s(now_.wHour, sdata, 10);
-		_headLog.append(sdata);
-		_headLog.append(":");
-		_itoa_s(now_.wMinute, sdata, 10);
-		_headLog.append(sdata);
-		_headLog.append(":");
-		_itoa_s(now_.wSecond, sdata, 10);
-		_headLog.append(sdata);
-		_headLog.append(">");
-		_headLog.append("[");
-		_headLog.append(_FILE);
-		_headLog.append("](Function: ");
-		_headLog.append(_func);
-		_headLog.append(")>>>>");
-		_headLog.append(name);
-		_headLog.append(": ");
+		if (flag_)
+		{
+			GetLocalTime(&now_);
+			char sdata[5];
+			std::string _headLog;
+			_headLog.append("<");
+			_itoa_s(now_.wHour, sdata, 10);
+			_headLog.append(sdata);
+			_headLog.append(":");
+			_itoa_s(now_.wMinute, sdata, 10);
+			_headLog.append(sdata);
+			_headLog.append(":");
+			_itoa_s(now_.wSecond, sdata, 10);
+			_headLog.append(sdata);
+			_headLog.append(">");
+			_headLog.append("[");
+			_headLog.append(_FILE);
+			_headLog.append("](Function: ");
+			_headLog.append(_func);
+			_headLog.append(")>>>>");
+			_headLog.append(name);
+			_headLog.append(": ");
 #if LOGGER_TYPE==LOGGER_TYPE_FILE
 
-		(*outfile_) << _headLog << format << std::endl;
+			(*outfile_) << _headLog << format << std::endl;
 
 #elif LOGGER_TYPE==LOGGER_TYPE_CONSOLE
 
-		std::cout << _headLog << format << std::endl;
+			std::cout << _headLog << format << std::endl;
 
 #elif LOGGER_TYPE==LOGGER_TYPE_NEROUT
 
-		Log2Ner(level, _headLog, format);
+			Log2Ner(level, _headLog, format);
 
 #endif
+		}
+		
 	}
 	extern Logger LOGGER;
 }
 
-#define LOG_INIT() debug::LOGGER.Initial()
+#define LOG_INIT(_flag) debug::LOGGER.Initial(_flag)
 #define LOG_INFO(format) debug::LOGGER.Log_Info(__FILE__, __func__, format)
 #define LOG_DEBUG(format) debug::LOGGER.Log_Debug(__FILE__, __func__, format)
 #define LOG_WARN(format) debug::LOGGER.Log_Warn(__FILE__, __func__, format)
@@ -131,7 +132,7 @@ namespace debug
 
 #else
 
-#define LOG_INIT()
+#define LOG_INIT(flag)
 #define LOG_INFO(format, ...)
 #define LOG_DEBUG(format, ...)
 #define LOG_WARN(format, ...)
