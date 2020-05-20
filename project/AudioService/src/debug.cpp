@@ -40,39 +40,38 @@ void GetInstanceFolderPath(std::string* dirPath)
 
 #ifdef DEBUG_SWITCH
 
-const std::string debug::Logger::FILENAME = "ADV_Log.log";
-const debug::LEVEL debug::Logger::maxLevel = debug::DEBUGLEVEL;
+#if LOGGER_TYPE==LOGGER_TYPE_FILE
 
-debug::Logger::Logger(LOGTYPE type)
-{
-	type_ = type;
-}
+const std::string debug::Logger::FILENAME = "ADV_Log.log";
+
+#endif
+
+const debug::LEVEL debug::Logger::maxLevel = debug::DEBUGLEVEL;
 
 debug::Logger::~Logger()
 {
+#if LOGGER_TYPE==LOGGER_TYPE_FILE
+
 	if (NULL != outfile_)
 	{
 		outfile_->close();
 		delete outfile_;
 		outfile_ = NULL;
 	}
+
+#endif
 }
 
 void debug::Logger::Initial()
 {
-	if (type_ == LOGTYPE::T_FILE)
-	{
-		std::string _dirPath;
-		GetInstanceFolderPath(&_dirPath);
-		_dirPath += FILENAME;
-		std::ofstream _temp(_dirPath, std::ios::out);
-		_temp.close();
-		outfile_ = new std::ofstream(_dirPath, std::ios::app);
-	}
-	else
-	{
-		outfile_ = NULL;
-	}
+#if LOGGER_TYPE==LOGGER_TYPE_FILE
+	std::string _dirPath;
+	GetInstanceFolderPath(&_dirPath);
+	_dirPath += FILENAME;
+	std::ofstream _temp(_dirPath, std::ios::out);
+	_temp.close();
+	outfile_ = new std::ofstream(_dirPath, std::ios::app);
+#endif
 }
 
 void debug::Logger::Log_Info(const char* _FILE, const char* _func, const char* format)
@@ -99,6 +98,7 @@ void debug::Logger::Log_Error(const char* _FILE, const char* _func, const char* 
 		Log_Base(_FILE, _func, debug::LEVEL::_ERROR_, "ERROR", format);
 }
 
+#if LOGGER_TYPE==LOGGER_TYPE_NEROUT
 
 void debug::Logger::NerLog(LEVEL level, std::string headLog, const char* sdata)
 {
@@ -149,7 +149,9 @@ void debug::Logger::Log2Ner(LEVEL level, std::string headLog, std::string data)
 	NerLog(level, headLog, data.c_str());
 }
 
-debug::Logger debug::LOGGER = debug::Logger(debug::LOGGERTYPE);
+#endif
+
+debug::Logger debug::LOGGER = debug::Logger();
 
 
 

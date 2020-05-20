@@ -1,39 +1,58 @@
+#pragma once
+
 #ifndef DEBUG_H
 #define DEBUG_H
 
-#include <NERvGear/NERvSDK.h>
 #include <windows.h>
 #include <iostream>
-
 #define MAX_CHAR_LENGTH 256
 #define _T(x) x
+
+
+
+
+
+
 
 void String2TCHAR(const std::string _str, TCHAR* tchar);
 void GetInstanceFolderPath(std::string* dirPath);
 
 //调试开关
-#define DEBUG_SWITCH
+//#define DEBUG_SWITCH
 
 #ifdef DEBUG_SWITCH
 
+// 日志类型: 
+// LOGGER_TYPE_FILE = 文件输出
+// LOGGER_TYPE_CONSOLE = std控制台输出
+// LOGGER_TYPE_NEROUT = NERvLog输出
+#define LOGGER_TYPE_FILE 0
+#define LOGGER_TYPE_CONSOLE 1
+#define LOGGER_TYPE_NEROUT 2
+
+#define LOGGER_TYPE LOGGER_TYPE_FILE
+
+#if LOGGER_TYPE==LOGGER_TYPE_FILE
+
 #include <fstream>
+
+#elif LOGGER_TYPE ==LOGGER_TYPE_NEROUT
+
+#include <NERvGear/NERvSDK.h>
 #include "../include/defs.h"
+
+#endif
 
 namespace debug
 {
-	enum LOGTYPE { T_FILE, T_CONSOLE, T_NEROUT };
-	enum LEVEL { _INFO_ = 0, _DEBUG_ = 1, _WARN_ = 2, _ERROR_ = 3, _ALL_ = 4 };
+	enum class LEVEL { _INFO_ = 0, _DEBUG_ = 1, _WARN_ = 2, _ERROR_ = 3, _ALL_ = 4 };
 
 	//控制输出等级
 	const debug::LEVEL DEBUGLEVEL(LEVEL::_ALL_);
 
-	// LOGTYPE定义Logger的类型
-	const debug::LOGTYPE LOGGERTYPE(LOGTYPE::T_FILE);
-
 	class Logger
 	{
 	public:
-		Logger(LOGTYPE type);
 		~Logger();
 		void Initial();
 		void Log_Info(const char* _FILE, const char* _func, const char* format);
@@ -43,16 +62,23 @@ namespace debug
 		template<typename T> void Log_Base(const char* _FILE, const char* _func, LEVEL level, const char* name, T format);
 
 	private:
+#if LOGGER_TYPE ==LOGGER_TYPE_NEROUT
+
 		void Log2Ner(LEVEL level, std::string headLog, long data);
 		void Log2Ner(LEVEL level, std::string headLog, char* data);
 		void Log2Ner(LEVEL level, std::string headLog, const char* data);
 		void Log2Ner(LEVEL level, std::string headLog, std::string data);
 		void NerLog(LEVEL level, std::string headLog, const char* sdata);
 
+#endif
+
+#if LOGGER_TYPE==LOGGER_TYPE_FILE
+
 		static const std::string FILENAME;
-		static const LEVEL maxLevel;
-		LOGTYPE type_;
 		std::ofstream* outfile_;
+
+#endif
+		static const LEVEL maxLevel;
 		SYSTEMTIME now_;
 	};
 
@@ -79,21 +105,20 @@ namespace debug
 		_headLog.append(")>>>>");
 		_headLog.append(name);
 		_headLog.append(": ");
-		switch (type_)
-		{
-		case(LOGTYPE::T_NEROUT):
-			Log2Ner(level, _headLog, format);
-			break;
-		case(LOGTYPE::T_FILE):
-			(*outfile_) << _headLog << format << std::endl;
-			break;
-		case(LOGTYPE::T_CONSOLE):
-			std::cout << _headLog << format << std::endl;
-			break;
-		}
+#if LOGGER_TYPE==LOGGER_TYPE_FILE
 
+		(*outfile_) << _headLog << format << std::endl;
+
+#elif LOGGER_TYPE==LOGGER_TYPE_CONSOLE
+
+		std::cout << _headLog << format << std::endl;
+
+#elif LOGGER_TYPE==LOGGER_TYPE_NEROUT
+
+		Log2Ner(level, _headLog, format);
+
+#endif
 	}
-
 	extern Logger LOGGER;
 }
 

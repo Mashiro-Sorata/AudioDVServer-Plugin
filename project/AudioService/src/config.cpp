@@ -3,6 +3,22 @@
 #include "../include/debug.h"
 
 
+#ifdef DEBUG_SWITCH
+
+#if LOGGER_TYPE!=LOGGER_TYPE_NEROUT
+
+#define _NVG_TEXT(_TEXT) L##_TEXT
+#define NVG_TEXT(_TEXT) _NVG_TEXT(_TEXT)
+
+#endif
+
+#else
+
+#define _NVG_TEXT(_TEXT) L##_TEXT
+#define NVG_TEXT(_TEXT) _NVG_TEXT(_TEXT)
+
+#endif
+
 void ReadConfig(char** _ip, unsigned short* _port, int* _maxClient)
 {
     LOG_INFO(_T("∂¡»°≈‰÷√Œƒº˛..."));
@@ -16,7 +32,7 @@ void ReadConfig(char** _ip, unsigned short* _port, int* _maxClient)
     char c_ip[17];
     String2TCHAR(dirPath + CONFIGFILE, wdirPath);
     GetPrivateProfileString(NVG_TEXT("server"), NVG_TEXT("ip"), NVG_TEXT(DEFAULT_IP_LOCAL), w_ip, 17, wdirPath);
-    if (!lstrcmp(NVG_TEXT("ANY"),w_ip))
+    if (!lstrcmp(NVG_TEXT("ANY"), w_ip))
     {
         LOG_DEBUG(_T("INADDR_ANY"));
         strcpy(*_ip, DEFAULT_IP_ANY);
