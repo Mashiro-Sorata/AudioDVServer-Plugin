@@ -11,11 +11,12 @@ var ADV_Plugin = (function(){
     function _adv_plugin(ip, port) {
         var _this = this;
         if(_this instanceof _adv_plugin) {
-            if("ANY" == ip || "any" == ip) {
-                _this.address = "ws://0.0.0.0:" + port;
+            if("local" == ip.toLocaleLowerCase()) {
+            	_this.address = "ws://localhost:" + port;
+                
             } 
             else {
-                _this.address = "ws://localhost:" + port;
+                _this.address = "ws://" + ip + ":" + port;
             }
 
             _this.ondata = function(audioData){};

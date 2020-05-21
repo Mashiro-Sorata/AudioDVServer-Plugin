@@ -31,11 +31,6 @@
     <script>
     	var IP = "local";
     	var PORT = 5050;
-		//频谱线颜色
-		var LINE_COLOR = "rgba(0,191,255,0.4)";
-		//分界线的颜色
-		var CENTER_COLOR = "rgba(0,0,0,0.9)";
-		
         //引用插件
         var adv = new ADV_Plugin(IP, PORT);
 
@@ -97,11 +92,13 @@
             //ctx.transform(0.9645, 0, -9 * (Math.PI / 180), 1, 0, 0);
             //ctx.rotate(7 * (Math.PI / 180));
 
-            ctx.fillStyle = CENTER_COLOR;
+            //分界线的颜色
+            ctx.fillStyle = "rgba(0,0,0,0.9)";
             //绘制分界线
             ctx.fillRect(-10, 320, 1400, 2);
 
-            ctx.fillStyle = LINE_COLOR;
+            //频谱线颜色
+            ctx.fillStyle = "rgba(248,248,255,0.6)";
 
             //绘制频谱
             for (var i = 0; i < 128; i++) {
