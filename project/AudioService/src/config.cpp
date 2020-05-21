@@ -27,24 +27,24 @@ void ReadConfig(char** _ip, unsigned short* _port, int* _maxClient, bool* _logge
     TCHAR w_temp[17];
     String2TCHAR(dirPath + CONFIGFILE, wdirPath);
     GetPrivateProfileString(NVG_TEXT("server"), NVG_TEXT("ip"), NVG_TEXT(DEFAULT_IP_LOCAL), w_temp, 17, wdirPath);
-    if (!lstrcmp(NVG_TEXT("ANY"), w_temp))
+    if (lstrcmpi(NVG_TEXT("any"), w_temp))
     {
-        strcpy(*_ip, DEFAULT_IP_ANY);
+        strcpy(*_ip, DEFAULT_IP_LOCAL);
     }
     else
     {
-        strcpy(*_ip, DEFAULT_IP_LOCAL);
+        strcpy(*_ip, DEFAULT_IP_ANY);
     }
     *_port = GetPrivateProfileInt(NVG_TEXT("server"), NVG_TEXT("port"), DEFAULT_PORT, wdirPath);
     *_maxClient = GetPrivateProfileInt(NVG_TEXT("server"), NVG_TEXT("maxclient"), DEFAULT_MAXCLIENTS, wdirPath);
     GetPrivateProfileString(NVG_TEXT("server"), NVG_TEXT("logger"), NVG_TEXT("false"), w_temp, 17, wdirPath);
-    if (!lstrcmp(NVG_TEXT("true"), w_temp))
+    if (lstrcmpi(NVG_TEXT("true"), w_temp))
     {
-        *_logger = true;
+        *_logger = false;
     }
     else
     {
-        *_logger = false;
+        *_logger = true;
     }
 }
 

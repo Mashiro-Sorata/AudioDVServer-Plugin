@@ -13,7 +13,7 @@ void String2TCHAR(const std::string _str, TCHAR* tchar);
 void GetInstanceFolderPath(std::string* dirPath);
 
 //调试开关
-//#define DEBUG_SWITCH
+#define DEBUG_SWITCH
 
 #ifdef DEBUG_SWITCH
 
@@ -43,13 +43,13 @@ namespace debug
 	enum class LEVEL { _ERROR_ = 0, _WARN_ = 1, _INFO_ = 2, _DEBUG_ = 3, _ALL_ = 4 };
 
 	//控制输出等级
-	const debug::LEVEL DEBUGLEVEL(LEVEL::_ALL_);
+	const debug::LEVEL DebugLevel(LEVEL::_ALL_);
 
-	class Logger
+	class CLogger
 	{
 	public:
-		Logger();
-		~Logger();
+		CLogger();
+		~CLogger();
 		void Initial(bool flag);
 		void Log_Info(const char* _FILE, const char* _func, const char* format);
 		void Log_Debug(const char* _FILE, const char* _func, const char* format);
@@ -60,41 +60,41 @@ namespace debug
 	private:
 #if LOGGER_TYPE ==LOGGER_TYPE_NEROUT
 
-		void Log2Ner(LEVEL level, std::string headLog, long data);
-		void Log2Ner(LEVEL level, std::string headLog, char* data);
-		void Log2Ner(LEVEL level, std::string headLog, const char* data);
-		void Log2Ner(LEVEL level, std::string headLog, std::string data);
-		void NerLog(LEVEL level, std::string headLog, const char* sdata);
+		void Log2Ner_(LEVEL level, std::string headLog, long data);
+		void Log2Ner_(LEVEL level, std::string headLog, char* data);
+		void Log2Ner_(LEVEL level, std::string headLog, const char* data);
+		void Log2Ner_(LEVEL level, std::string headLog, std::string data);
+		void NerLog_(LEVEL level, std::string headLog, const char* sdata);
 
 #endif
 
 #if LOGGER_TYPE==LOGGER_TYPE_FILE
 
-		static const std::string FILENAME;
-		std::ofstream* outfile_;
+		static const std::string sm_fileName_;
+		std::ofstream* m_outfile_;
 
 #endif
-		bool flag_;
-		static const LEVEL maxLevel;
-		SYSTEMTIME now_;
+		bool m_flag_;
+		static const LEVEL sm_maxLevel_;
+		SYSTEMTIME m_now_;
 	};
 
 	template<typename T>
-	void Logger::Log_Base(const char* _FILE, const char* _func, LEVEL level, const char* name, T format)
+	void CLogger::Log_Base(const char* _FILE, const char* _func, LEVEL level, const char* name, T format)
 	{
-		if (flag_)
+		if (m_flag_)
 		{
-			GetLocalTime(&now_);
+			GetLocalTime(&m_now_);
 			char sdata[5];
 			std::string _headLog;
 			_headLog.append("<");
-			_itoa_s(now_.wHour, sdata, 10);
+			_itoa_s(m_now_.wHour, sdata, 10);
 			_headLog.append(sdata);
 			_headLog.append(":");
-			_itoa_s(now_.wMinute, sdata, 10);
+			_itoa_s(m_now_.wMinute, sdata, 10);
 			_headLog.append(sdata);
 			_headLog.append(":");
-			_itoa_s(now_.wSecond, sdata, 10);
+			_itoa_s(m_now_.wSecond, sdata, 10);
 			_headLog.append(sdata);
 			_headLog.append(">");
 			_headLog.append("[");
@@ -106,7 +106,7 @@ namespace debug
 			_headLog.append(": ");
 #if LOGGER_TYPE==LOGGER_TYPE_FILE
 
-			(*outfile_) << _headLog << format << std::endl;
+			(*m_outfile_) << _headLog << format << std::endl;
 
 #elif LOGGER_TYPE==LOGGER_TYPE_CONSOLE
 
@@ -114,13 +114,13 @@ namespace debug
 
 #elif LOGGER_TYPE==LOGGER_TYPE_NEROUT
 
-			Log2Ner(level, _headLog, format);
+			Log2Ner_(level, _headLog, format);
 
 #endif
 		}
 		
 	}
-	extern Logger LOGGER;
+	extern CLogger LOGGER;
 }
 
 #define LOG_INIT(_flag) debug::LOGGER.Initial(_flag)

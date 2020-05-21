@@ -13,37 +13,6 @@
 
 
 
-struct WebSocketStreamHeader {
-	unsigned int header_size;				//数据包头大小
-	int mask_offset;					//掩码偏移
-	unsigned int payload_size;				//数据大小
-	bool fin;                                               //帧标记
-	bool masked;					        //掩码
-	unsigned char opcode;					//操作码
-	unsigned char res[3];
-};
-
-enum WS_Status
-{
-	WS_STATUS_CONNECT = 0,
-	WS_STATUS_UNCONNECT = 1,
-};
-
-
-enum WS_FrameType
-{
-	WS_EMPTY_FRAME = 0xF0,
-	WS_ERROR_FRAME = 0xF1,
-	WS_TEXT_FRAME = 0x01,
-	WS_BINARY_FRAME = 0x02,
-	WS_PING_FRAME = 0x09,
-	WS_PONG_FRAME = 0x0A,
-	WS_OPENING_FRAME = 0xF3,
-	WS_CLOSING_FRAME = 0x08
-};
-
-
-
 #define DEFAULT_IP_LOCAL "127.0.0.1"
 #define DEFAULT_IP_ANY "0.0.0.0"
 #define DEFAULT_PORT 5050
@@ -65,60 +34,60 @@ public:
 	
 
 	//检测客户端的间隔时间
-	static const u_short INTERVAL;
+	static const u_short sm_Interval;
 	//发送长度
-	static const u_short SENDLENGTH;
+	static const u_short sm_SendLength;
 	//单声道发送长度
-	static const u_short MONOSENDLENGTH;
+	static const u_short sm_MonoSendLength;
 	
-	static const int DataIndex[64];
-	static const int Gap[64];
+	static const int sm_DataIndex[64];
+	static const int sm_Gap[64];
 
 private:
-	bool Initial();
-	bool StartMainLoopService();
-	bool StartBufferSenderService();
-	static unsigned int __stdcall MainLoopService(PVOID pParam);
-	static unsigned int __stdcall BufferSenderService(PVOID pParam);
-	void SendToClients(char* buffer);
+	bool Initial_();
+	bool StartMainLoopService_();
+	bool StartBufferSenderService_();
+	static unsigned int __stdcall MainLoopService_(PVOID pParam);
+	static unsigned int __stdcall BufferSenderService_(PVOID pParam);
+	void SendToClients_(char* buffer);
 	
-	static CADataCapture* audioCapture;
+	static CADataCapture* sm_pAudioCapture_;
 
 	//状态控制:1->运行,0->停止
-	static std::atomic<bool> control;
+	static std::atomic<bool> sm_control_;
 	//记录连接到服务端的client数量
-	static std::atomic<u_short> clientNum;
+	static std::atomic<u_short> sm_clientNum_;
 
 	//向量存放客户端地址
-	static std::vector<SOCKET> clientsVector;
+	static std::vector<SOCKET> sm_clientsVector_;
 	//保证clientsVector不能同时操作
-	static std::mutex clientsMutex;
+	static std::mutex sm_clientsMutex_;
 
 	//每次处理的数据个数
-	static const UINT32 dataSize;
-	static const size_t complexSize;
-
-	//Server的地址:默认0.0.0.0
-	u_long ip_;
-	//端口号:默认5050
-	u_short port_;
-	//最大连接数
-	int maxClients_;
+	static const UINT32 sm_DataSize_;
+	static const size_t sm_ComplexSize_;
 
 	//发送缓冲区
-	static float* sendBuffer;
-	static float* lSendBuffer;
-	static float* rSendBuffer;
+	static float* sm_pSendBuffer_;
+	static float* sm_pLSendBuffer_;
+	static float* sm_pRSendBuffer_;
+
+	//Server的地址:默认0.0.0.0
+	u_long m_ip_;
+	//端口号:默认5050
+	u_short m_port_;
+	//最大连接数
+	int m_maxClients_;
 
 	//定义服务端套接字，接受请求套接字
-	SOCKET socketServer_;
+	SOCKET m_socketServer_;
 	//服务端地址客户端地址
-	SOCKADDR_IN serverAddr_;
+	SOCKADDR_IN m_serverAddr_;
 
-	HANDLE mainLoopServiceHandle_;
-	unsigned int mainLoopServiceID_;
-	HANDLE bufferSenderServiceHandle_;
-	unsigned int bufferSenderServiceID_;
+	HANDLE m_mainLoopServiceHandle_;
+	unsigned int m_mainLoopServiceID_;
+	HANDLE m_bufferSenderServiceHandle_;
+	unsigned int m_bufferSenderServiceID_;
 };
 
 #endif // A2FFT_SERVER_H

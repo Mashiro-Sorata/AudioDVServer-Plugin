@@ -70,6 +70,7 @@ long CAudioDVServer::OnInitial()
     ReadConfig(&srv_ip, &srv_port, &srv_maxconn, &srv_logger);
     LOG_INIT(srv_logger);
     LOG_INFO(_T("Initial CAudioDVServer!"));
+    LOG_BASE("Server Address", srv_ip);
     audioServer = new CA2FFTServer(srv_ip, srv_port, srv_maxconn);
     return PluginImpl::OnInitial();
 }

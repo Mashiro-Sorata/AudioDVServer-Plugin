@@ -1,33 +1,41 @@
 #include "audiocapture.h"
+#include "debug.h"
 
+
+const IID IID_IAudioCaptureClient(__uuidof(IAudioCaptureClient));
+const CLSID CLSID_MMDeviceEnumerator(__uuidof(MMDeviceEnumerator));
+const IID IID_IMMDeviceEnumerator(__uuidof(IMMDeviceEnumerator));
+const IID IID_IAudioClient(__uuidof(IAudioClient));
 
 CADataCapture::CADataCapture() : IMMNotificationClient()
 {
-	pAudioClient = NULL;
-	pCaptureClient = NULL;
-	pEnumerator = NULL;
-	pDevice = NULL;
-	pwfx = NULL;
-	pData = NULL;
-	numFramesAvailable = 0;
-	packetLength = 0;
-	pData = NULL;
-	flags = 0;
-	changing_ = false;
-	start_ = false;
-	wait_ = false;
-	role_ = ERole_enum_count;
+	m_pAudioClient_ = NULL;
+	m_pCaptureClient_ = NULL;
+	m_pEnumerator_ = NULL;
+	m_pDevice_ = NULL;
+	m_pwfx_ = NULL;
+	m_pData_ = NULL;
+	m_numFramesAvailable_ = 0;
+	m_packetLength_ = 0;
+	m_pData_ = NULL;
+	m_flags_ = 0;
+	m_changing_ = false;
+	m_start_ = false;
+	m_wait_ = false;
+	m_role_ = ERole_enum_count;
 }
 
 CADataCapture::~CADataCapture()
 {
-	CoTaskMemFree(pwfx);
-	if (pEnumerator != NULL) pEnumerator->Release();
-	if (pDevice != NULL) pDevice->Release();
-	if (pAudioClient != NULL) pAudioClient->Release();
-	if (pCaptureClient != NULL) pCaptureClient->Release();
+	m_pEnumerator_->UnregisterEndpointNotificationCallback(this);
+	CoTaskMemFree(m_pwfx_);
+	if (m_pCaptureClient_ != NULL) m_pCaptureClient_->Release();
+	if (m_pAudioClient_ != NULL) m_pAudioClient_->Release();
+	if (m_pDevice_ != NULL) m_pDevice_->Release();
+	if (m_pEnumerator_ != NULL) m_pEnumerator_->Release();
+	m_pData_ = NULL;
+	LOG_INFO("~CADataCapture!");
 	CoUninitialize();
-	pEnumerator->UnregisterEndpointNotificationCallback(this);
 }
 
 HRESULT CADataCapture::Initial()
@@ -40,12 +48,13 @@ HRESULT CADataCapture::Initial()
 		return hr;
 	}
 
-	hr = CoCreateInstance(CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, IID_IMMDeviceEnumerator, (void**)&pEnumerator);
+	hr = CoCreateInstance(CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, IID_IMMDeviceEnumerator, (void**)&m_pEnumerator_);
+
 	if (FAILED(hr)) {
 		LOG_ERROR(_T("Faild to CoCreateInstance"));
 		return hr;
 	}
-	pEnumerator->RegisterEndpointNotificationCallback(this);
+	m_pEnumerator_->RegisterEndpointNotificationCallback(this);
 	return S_OK;
 }
 
@@ -53,27 +62,27 @@ HRESULT CADataCapture::ExInitial()
 {
 	HRESULT hr;
 	// get default output audio endpoint
-	hr = pEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &pDevice);
+	hr = m_pEnumerator_->GetDefaultAudioEndpoint(eRender, eMultimedia, &m_pDevice_);
 	if (FAILED(hr)) {
 		LOG_ERROR(_T("Faild to GetDefaultAudioEndpoint"));
 		return hr;
 	}
 
 	// activates device
-	hr = pDevice->Activate(IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&pAudioClient);
+	hr = m_pDevice_->Activate(IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&m_pAudioClient_);
 	if (FAILED(hr)) {
 		LOG_ERROR(_T("Faild to Activate Decive"));
 		return hr;
 	}
 
 	// gets audio format
-	hr = pAudioClient->GetMixFormat(&pwfx);
+	hr = m_pAudioClient_->GetMixFormat(&m_pwfx_);
 	if (FAILED(hr)) {
 		LOG_ERROR(_T("Faild to GetMixFormat"));
 		return hr;
 	}
 
-	hr = pAudioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK, REFTIMES_PER_SEC, 0, pwfx, NULL);
+	hr = m_pAudioClient_->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK, REFTIMES_PER_SEC, 0, m_pwfx_, NULL);
 	if (FAILED(hr)) {
 		LOG_ERROR(_T("Faild to Initialize Audio Client"));
 		return hr;
@@ -81,13 +90,13 @@ HRESULT CADataCapture::ExInitial()
 
 	UINT32 bufferFrameCount;
 	// Get the size of the allocated buffer.
-	hr = pAudioClient->GetBufferSize(&bufferFrameCount);
+	hr = m_pAudioClient_->GetBufferSize(&bufferFrameCount);
 	if (FAILED(hr)) {
 		LOG_ERROR(_T("Faild to GetBufferSize"));
 		return hr;
 	}
 
-	hr = pAudioClient->GetService(IID_IAudioCaptureClient, (void**)&pCaptureClient);
+	hr = m_pAudioClient_->GetService(IID_IAudioCaptureClient, (void**)&m_pCaptureClient_);
 	if (FAILED(hr)) {
 		LOG_ERROR(_T("Faild to GetService"));
 		return hr;
@@ -98,61 +107,81 @@ HRESULT CADataCapture::ExInitial()
 
 HRESULT CADataCapture::Start()
 {
-	HRESULT hr = pAudioClient->Start();
+	HRESULT hr = m_pAudioClient_->Start();
 	if (FAILED(hr))
 	{
 		LOG_ERROR(_T("Failed to Start"));
 		return hr;
 	}
-	start_ = true;
+	m_start_ = true;
 	return hr;
 }
 
 HRESULT CADataCapture::Stop()
 {
-	 HRESULT hr = pAudioClient->Stop();
+	 HRESULT hr = m_pAudioClient_->Stop();
 	if (FAILED(hr))
 	{
 		LOG_ERROR(_T("Failed to Stop"));
 	}
-	start_ = false;
+	m_start_ = false;
 	return hr;
 }
 
 HRESULT CADataCapture::get_NextPacketSize()
 {
 	HRESULT hr;
-	hr = pCaptureClient->GetNextPacketSize(&packetLength);
+	hr = m_pCaptureClient_->GetNextPacketSize(&m_packetLength_);
 	return hr;
 }
 
 HRESULT CADataCapture::get_Buffer()
 {
 	HRESULT hr;
-	hr = pCaptureClient->GetBuffer(&pData, &numFramesAvailable, &flags, NULL, NULL);
+	hr = m_pCaptureClient_->GetBuffer(&m_pData_, &m_numFramesAvailable_, &m_flags_, NULL, NULL);
 	return hr;
 }
 
 HRESULT CADataCapture::ReleaseBuffer()
 {
 	HRESULT hr;
-	hr = pCaptureClient->ReleaseBuffer(numFramesAvailable);
+	hr = m_pCaptureClient_->ReleaseBuffer(m_numFramesAvailable_);
 	return hr;
 }
 
 void CADataCapture::WaitBegin()
 {
-	wait_ = true;
+	m_wait_ = true;
 }
 
 void CADataCapture::WaitEnd()
 {
-	wait_ = false;
+	m_wait_ = false;
 }
 
 bool CADataCapture::IsChanging()
 {
-	return changing_;
+	return m_changing_;
+}
+
+UINT32 CADataCapture::GetNumFramesAvailable()
+{
+	return m_numFramesAvailable_;
+}
+
+UINT32 CADataCapture::GetPacketLength()
+{
+	return m_packetLength_;
+}
+
+DWORD CADataCapture::GetFlags()
+{
+	return m_flags_;
+}
+
+void CADataCapture::GetData(float** dataBuff)
+{
+	*dataBuff = (float*)m_pData_;
 }
 
 HRESULT STDMETHODCALLTYPE CADataCapture::QueryInterface(REFIID riid, void** ppvObject)
@@ -178,12 +207,12 @@ HRESULT STDMETHODCALLTYPE CADataCapture::QueryInterface(REFIID riid, void** ppvO
 
 ULONG STDMETHODCALLTYPE CADataCapture::AddRef(void)
 {
-	return InterlockedIncrement(&mReferenceCount);
+	return InterlockedIncrement(&m_referenceCount_);
 }
 
 ULONG STDMETHODCALLTYPE CADataCapture::Release(void)
 {
-	auto count = InterlockedDecrement(&mReferenceCount);
+	auto count = InterlockedDecrement(&m_referenceCount_);
 	if (count == 0)
 	{
 		delete this;
@@ -197,37 +226,37 @@ HRESULT STDMETHODCALLTYPE CADataCapture::OnDefaultDeviceChanged(
 	_In_ LPCWSTR pwstrDefaultDeviceId
 )
 {
-	if (!pEnumerator)
+	if (!m_pEnumerator_)
 	{
 		return S_OK;
 	}
-	if (role_ == ERole_enum_count)
+	if (m_role_ == ERole_enum_count)
 	{
-		role_ = role;
+		m_role_ = role;
 	}
 	else
 	{
-		if (role_ != role)
+		if (m_role_ != role)
 			return S_OK;
 	}
 	LOG_INFO(_T("Device Changed!"));
-	changing_ = true;
-	while (wait_)
+	m_changing_ = true;
+	while (m_wait_)
 	{
 		Sleep(1);
 	}
-	pAudioClient->Stop();
-	pAudioClient->Release();
-	CoTaskMemFree(pwfx);
-	pDevice->Release();
+	m_pAudioClient_->Stop();
+	m_pAudioClient_->Release();
+	CoTaskMemFree(m_pwfx_);
+	m_pDevice_->Release();
 
-	pEnumerator->GetDevice(pwstrDefaultDeviceId, &pDevice);
+	m_pEnumerator_->GetDevice(pwstrDefaultDeviceId, &m_pDevice_);
 	ExInitial();
-	if (start_)
+	if (m_start_)
 	{
 		Start();
 	}
-	changing_ = false;
+	m_changing_ = false;
 	return S_OK;
 }
 

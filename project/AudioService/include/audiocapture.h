@@ -6,9 +6,6 @@
 #include <Audioclient.h>
 #include <mmdeviceapi.h>
 
-//Test
-#include "debug.h"
-
 #define REFTIMES_PER_SEC  10000000
 
 
@@ -29,10 +26,10 @@ public:
 	void WaitEnd();
 	bool IsChanging();
 
-	UINT32 numFramesAvailable;
-	UINT32 packetLength;
-	BYTE* pData;
-	DWORD flags;
+	UINT32 GetNumFramesAvailable();
+	UINT32 GetPacketLength();
+	DWORD GetFlags();
+	void GetData(float** dataBuff);
 
 public:
 	// IUnknown
@@ -48,27 +45,27 @@ public:
 	HRESULT STDMETHODCALLTYPE OnPropertyValueChanged(_In_  LPCWSTR pwstrDeviceId, _In_  const PROPERTYKEY key) override;
 
 private:
-	const IID IID_IAudioCaptureClient = __uuidof(IAudioCaptureClient);
-	const CLSID CLSID_MMDeviceEnumerator = __uuidof(MMDeviceEnumerator);
-	const IID IID_IMMDeviceEnumerator = __uuidof(IMMDeviceEnumerator);
-	const IID IID_IAudioClient = __uuidof(IAudioClient);
+	ULONG m_referenceCount_ = 0;
 
-	ULONG mReferenceCount = 0;
+	IMMDeviceEnumerator* m_pEnumerator_;
+	IMMDevice* m_pDevice_;
+	IAudioClient* m_pAudioClient_;
+	IAudioCaptureClient* m_pCaptureClient_;
+	WAVEFORMATEX* m_pwfx_;
 
-	IMMDeviceEnumerator* pEnumerator;
-	IMMDevice* pDevice;
-	IAudioClient* pAudioClient;
-	IAudioCaptureClient* pCaptureClient;
-	WAVEFORMATEX* pwfx;
+	ERole m_role_;
 
-	ERole role_;
+	UINT32 m_numFramesAvailable_;
+	UINT32 m_packetLength_;
+	BYTE* m_pData_;
+	DWORD m_flags_;
 
 	//主应用处于开始状态时将start置为true
-	bool start_;
+	bool m_start_;
 	//主应用在使用pCaptureClient时将wait置为true
-	bool wait_;
+	bool m_wait_;
 	//当默认设备改变重新设置的过程中changing为true
-	bool changing_;
+	bool m_changing_;
 };
 
 #endif // !AUDIOCAPTURE_H
