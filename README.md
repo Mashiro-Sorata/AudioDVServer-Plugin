@@ -65,7 +65,7 @@
 安装完成后打开SAO Utils首选项中的插件管理页面，将名称为`AudioDVServer`的插件选择启用后点击保存。
 
 通过更改`AudioDVServer`文件夹中的`advConfig.ini`文件来配置插件。当配置数据错误或无配置文件时使用默认值，配置值不区分大小写。
-- ip：可选，默认值为`127.0.0.1`，可更改为`any`，指代地址`0.0.0.0`。只支持`any`与默认参数`local`，定义插件提供服务的地址。
+- ip：可选，默认值为`local`，指代地址`127.0.0.1`，可更改为`any`，指代地址`0.0.0.0`。只支持`any`与默认参数`local`，定义插件提供服务的地址。
 - port：可选，默认值为`5050`，定义插件提供服务的端口号。
 - maxClient：可选，默认值为`5`，定义客户端最大连接数。
 - logger：可选，默认值为`false`，调试版(Debug Version)专有，发行版(Release Version)可设置，但无效。设置为`true`后可在插件所在目录下输出日志文件`ADV_Log.log`。
@@ -82,7 +82,10 @@ logger = true
 ### 客户端配置
 压缩包内提供了一个频谱显示客户端的示例，可用SAO Utils桌面网页挂件打开。通过设置`ADV_Client`文件夹内的`index.html`文件来配置地址，端口号以及显示频谱的样式。必须保证客户端与插件设置的地址与端口号一致。示例文件已配置好，可以直接使用。也可通过编写HTML文件来定义自己的频谱显示客户端。
 
-可以更改`index.html`中的以下代码来自定义客户端，值得注意的是`IP`与`PORT`需要与插件的设置一致。
+可以更改`index.html`中的以下代码来自定义客户端，值得注意的是`IP`与`PORT`需要与插件的设置"一致"：
+
+* 如果插件配置文件`advConfig.ini`中的`ip = any`, 客户端`IP`可选`"local"`，或者是插件所在主机的的局域网`ip`地址（如`"192.168.1.107"`）。
+* 如果插件配置文件`advConfig.ini`中的`ip = local`， 客户端`IP`必须为参数`"local"`。
 
 ```javascript
 var IP = "local";
@@ -105,9 +108,13 @@ var CENTER_COLOR = "rgba(0,0,0,0.9)";
 
 引用方法：
 ```javascript
-var adv = new ADV_Plugin("ANY",5050);
+var IP = "local"; // "192.168.1.107"
+var PORT = 5050;
+var adv = new ADV_Plugin(IP, PORT);
 adv.ondata = function(audioData){ //do something with audioData...};
 ```
+
+参数`IP`可选值有`"any"`，或者是插件所在主机的的局域网`ip`地址（如`"192.168.1.107"`）。参数`"local"`会被解析为`"localhost"`;
 
 每当客户端收到插件发送的频谱数据就会触发`ondata`事件。
 其中`audioData`是数据长度为`128`的数组，前面`64`个数据为左声道FFT数据，后面`64`个数据为右声道FFT数据。每一个声道的FFT数据位从低到高对应频谱频率的由低到高。
