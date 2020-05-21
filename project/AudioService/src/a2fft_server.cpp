@@ -4,6 +4,29 @@
 #include "../include/base64.h"
 
 
+
+static struct WebSocketStreamHeader {
+	unsigned int header_size;				//数据包头大小
+	int mask_offset;					//掩码偏移
+	unsigned int payload_size;				//数据大小
+	bool fin;                                               //帧标记
+	bool masked;					        //掩码
+	unsigned char opcode;					//操作码
+	unsigned char res[3];
+};
+
+static enum WS_FrameType
+{
+	WS_EMPTY_FRAME = 0xF0,
+	WS_ERROR_FRAME = 0xF1,
+	WS_TEXT_FRAME = 0x01,
+	WS_BINARY_FRAME = 0x02,
+	WS_PING_FRAME = 0x09,
+	WS_PONG_FRAME = 0x0A,
+	WS_OPENING_FRAME = 0xF3,
+	WS_CLOSING_FRAME = 0x08
+};
+
 //---------------WebSocket服务函数------------------
 
 /*
@@ -68,10 +91,6 @@ static bool wsReadHeader(char* cData, WebSocketStreamHeader* header)
 	unsigned char stream_size = buf[1] & 0x7F;
 
 	header->opcode = buf[0] & 0x0F;
-	// if (header->opcode == WS_FrameType::WS_CONTINUATION_FRAME) {  
-	//     //连续帧  
-	//     return false;  
-	// }
 	if (header->opcode == WS_TEXT_FRAME) {
 		//文本帧  
 	}
@@ -242,95 +261,105 @@ static int wsSend(SOCKET client, char* data, uint32_t len)
 //--------------CA2FFTServer类---------------------
 
 //与SENDLENGTH相关
-//将complexSize个fft数据压缩为SENDLENGTH/2个
-const int CA2FFTServer::DataIndex[64] = { 1, 3, 5, 6, 8, 9, 10, 11, 13, 14, 15, 17, 18, 20, 22, 24, 27, 29, 32, 35, 38, 42, 46, 50, 55, 60, 66, 72, 79, 87, 95, 104, 114, 125, 137, 149, 164, 179, 196, 215, 235, 257, 281, 308, 337, 369, 404, 442, 484, 529, 579, 634, 694, 759, 831, 909, 995, 1089, 1192, 1304, 1427, 1562, 1710, 2048 };
-const int CA2FFTServer::Gap[64] = { 1, 2, 2, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1, 2, 2, 2, 3, 2, 3, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 8, 8, 9, 10, 11, 12, 12, 15, 15, 17, 19, 20, 22, 24, 27, 29, 32, 35, 38, 42, 45, 50, 55, 60, 65, 72, 78, 86, 94, 103, 112, 123, 135, 148, 338 };
+//将sm_ComplexSize_个fft数据压缩为SENDLENGTH/2个
+const int CA2FFTServer::sm_DataIndex[64] = { 1, 3, 5, 6, 8, 9, 10, 11, 13, 14, 15, 17, 18, 20, 22, 24, 27, 29, 32, 35, 38, 42, 46, 50, 55, 60, 66, 72, 79, 87, 95, 104, 114, 125, 137, 149, 164, 179, 196, 215, 235, 257, 281, 308, 337, 369, 404, 442, 484, 529, 579, 634, 694, 759, 831, 909, 995, 1089, 1192, 1304, 1427, 1562, 1710, 2048 };
+const int CA2FFTServer::sm_Gap[64] = { 1, 2, 2, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1, 2, 2, 2, 3, 2, 3, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 8, 8, 9, 10, 11, 12, 12, 15, 15, 17, 19, 20, 22, 24, 27, 29, 32, 35, 38, 42, 45, 50, 55, 60, 65, 72, 78, 86, 94, 103, 112, 123, 135, 148, 338 };
 
 
 
-const u_short CA2FFTServer::INTERVAL = 25;
-const u_short CA2FFTServer::SENDLENGTH = 128;
-const u_short CA2FFTServer::MONOSENDLENGTH = CA2FFTServer::SENDLENGTH / 2;
+const u_short CA2FFTServer::sm_Interval = 25;
+const u_short CA2FFTServer::sm_SendLength = 128;
+const u_short CA2FFTServer::sm_MonoSendLength = CA2FFTServer::sm_SendLength / 2;
 
-std::atomic<bool> CA2FFTServer::control = false;
-std::vector<SOCKET> CA2FFTServer::clientsVector;
-std::mutex CA2FFTServer::clientsMutex;
-std::atomic<u_short> CA2FFTServer::clientNum = 0;
+std::atomic<bool> CA2FFTServer::sm_control_ = false;
+std::vector<SOCKET> CA2FFTServer::sm_clientsVector_;
+std::mutex CA2FFTServer::sm_clientsMutex_;
+std::atomic<u_short> CA2FFTServer::sm_clientNum_ = 0;
 
-CADataCapture* CA2FFTServer::audioCapture = new CADataCapture();
-const UINT32 CA2FFTServer::dataSize = 4096;
-const size_t CA2FFTServer::complexSize = audiofft::AudioFFT::ComplexSize(dataSize);
+CADataCapture* CA2FFTServer::sm_pAudioCapture_ = NULL;
+const UINT32 CA2FFTServer::sm_DataSize_ = 4096;
+const size_t CA2FFTServer::sm_ComplexSize_ = audiofft::AudioFFT::ComplexSize(sm_DataSize_);
 
-float* CA2FFTServer::sendBuffer = new float[SENDLENGTH];
-float* CA2FFTServer::lSendBuffer = new float[MONOSENDLENGTH];
-float* CA2FFTServer::rSendBuffer = new float[MONOSENDLENGTH];
+float* CA2FFTServer::sm_pSendBuffer_ = NULL;
+float* CA2FFTServer::sm_pLSendBuffer_ = NULL;
+float* CA2FFTServer::sm_pRSendBuffer_ = NULL;
 
 
 CA2FFTServer::CA2FFTServer(const char* ip, u_short port, int maxClients)
 {
-	ip_ = inet_addr(ip);
-	port_ = (port < 1 || port > 65535) ? htons(DEFAULT_PORT) : htons(port);
-	maxClients_ = (maxClients < 1) ? DEFAULT_MAXCLIENTS : maxClients;
-	socketServer_ = NULL;
-	mainLoopServiceID_ = NULL;
-	clientsVector.reserve(maxClients_);
+	m_ip_ = inet_addr(ip);
+	m_port_ = (port < 1 || port > 65535) ? htons(DEFAULT_PORT) : htons(port);
+	m_maxClients_ = (maxClients < 1) ? DEFAULT_MAXCLIENTS : maxClients;
+	m_socketServer_ = NULL;
+	m_mainLoopServiceID_ = NULL;
+	sm_clientsVector_.reserve(m_maxClients_);
 
-	socketServer_ = NULL;
+	m_socketServer_ = NULL;
 	//填充服务端信息
-	serverAddr_.sin_family = AF_INET;
-	serverAddr_.sin_addr.S_un.S_addr = ip_;
-	serverAddr_.sin_port = port_;
+	m_serverAddr_.sin_family = AF_INET;
+	m_serverAddr_.sin_addr.S_un.S_addr = m_ip_;
+	m_serverAddr_.sin_port = m_port_;
 
-	mainLoopServiceHandle_ = NULL;
-	mainLoopServiceID_ = 0;
-	bufferSenderServiceHandle_ = NULL;
-	bufferSenderServiceID_ = 0;
+	sm_pSendBuffer_ = new float[sm_SendLength];
+	sm_pLSendBuffer_ = new float[sm_MonoSendLength];
+	sm_pRSendBuffer_ = new float[sm_MonoSendLength];
+	sm_pAudioCapture_ = new CADataCapture();
+
+	m_mainLoopServiceHandle_ = NULL;
+	m_mainLoopServiceID_ = 0;
+	m_bufferSenderServiceHandle_ = NULL;
+	m_bufferSenderServiceID_ = 0;
 }
 
 CA2FFTServer::CA2FFTServer()
 {
-	ip_ = htonl(INADDR_LOOPBACK);
-	port_ = htons(DEFAULT_PORT);
-	maxClients_ = DEFAULT_MAXCLIENTS;
-	socketServer_ = NULL;
-	mainLoopServiceID_ = NULL;
-	clientsVector.reserve(maxClients_);
+	m_ip_ = htonl(INADDR_LOOPBACK);
+	m_port_ = htons(DEFAULT_PORT);
+	m_maxClients_ = DEFAULT_MAXCLIENTS;
+	m_socketServer_ = NULL;
+	m_mainLoopServiceID_ = NULL;
+	sm_clientsVector_.reserve(m_maxClients_);
 
-	socketServer_ = NULL;
+	m_socketServer_ = NULL;
 	//填充服务端信息
-	serverAddr_.sin_family = AF_INET;
-	serverAddr_.sin_addr.S_un.S_addr = ip_;
-	serverAddr_.sin_port = port_;
+	m_serverAddr_.sin_family = AF_INET;
+	m_serverAddr_.sin_addr.S_un.S_addr = m_ip_;
+	m_serverAddr_.sin_port = m_port_;
 
-	mainLoopServiceHandle_ = NULL;
-	mainLoopServiceID_ = 0;
-	bufferSenderServiceHandle_ = NULL;
-	bufferSenderServiceID_ = 0;
+	sm_pSendBuffer_ = new float[sm_SendLength];
+	sm_pLSendBuffer_ = new float[sm_MonoSendLength];
+	sm_pRSendBuffer_ = new float[sm_MonoSendLength];
+	sm_pAudioCapture_ = new CADataCapture();
+
+	m_mainLoopServiceHandle_ = NULL;
+	m_mainLoopServiceID_ = 0;
+	m_bufferSenderServiceHandle_ = NULL;
+	m_bufferSenderServiceID_ = 0;
 }
 
 CA2FFTServer::~CA2FFTServer()
 {
-	audioCapture->Stop();
-	clientsMutex.lock();
-	CloseHandle(mainLoopServiceHandle_);
-	CloseHandle(bufferSenderServiceHandle_);
-	clientsMutex.unlock();
+	sm_pAudioCapture_->Stop();
+	sm_clientsMutex_.lock();
+	CloseHandle(m_mainLoopServiceHandle_);
+	CloseHandle(m_bufferSenderServiceHandle_);
+	sm_clientsMutex_.unlock();
 	//关闭套接字
-	closesocket(socketServer_);
+	closesocket(m_socketServer_);
 
-	delete[] sendBuffer;
-	delete[] lSendBuffer;
-	delete[] rSendBuffer;
-	delete audioCapture;
-	audioCapture = NULL;
-	sendBuffer = NULL;
-	lSendBuffer = NULL;
-	rSendBuffer = NULL;
+	delete[] sm_pSendBuffer_;
+	delete[] sm_pLSendBuffer_;
+	delete[] sm_pRSendBuffer_;
+	delete sm_pAudioCapture_;
+	sm_pAudioCapture_ = NULL;
+	sm_pSendBuffer_ = NULL;
+	sm_pLSendBuffer_ = NULL;
+	sm_pRSendBuffer_ = NULL;
 	//释放DLL资源
 	WSACleanup();
 }
 
-bool CA2FFTServer::Initial()
+bool CA2FFTServer::Initial_()
 {
 	//版本号
 	WORD w_req = MAKEWORD(2, 2);
@@ -355,14 +384,14 @@ bool CA2FFTServer::Initial()
 	}
 
 	//创建套接字
-	socketServer_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	m_socketServer_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	BOOL bReUseAddr = TRUE;
-	setsockopt(socketServer_, SOL_SOCKET, SO_REUSEADDR, (const char*)&bReUseAddr, sizeof(BOOL));
+	setsockopt(m_socketServer_, SOL_SOCKET, SO_REUSEADDR, (const char*)&bReUseAddr, sizeof(BOOL));
 	BOOL  bDontLinger = FALSE;
-	setsockopt(socketServer_, SOL_SOCKET, SO_DONTLINGER, (const char*)&bDontLinger, sizeof(BOOL));
+	setsockopt(m_socketServer_, SOL_SOCKET, SO_DONTLINGER, (const char*)&bDontLinger, sizeof(BOOL));
 
-	if (bind(socketServer_, (SOCKADDR*)&serverAddr_, sizeof(SOCKADDR)) == SOCKET_ERROR)
+	if (bind(m_socketServer_, (SOCKADDR*)&m_serverAddr_, sizeof(SOCKADDR)) == SOCKET_ERROR)
 	{
 		LOG_ERROR(_T("套接字绑定失败!"));
 		WSACleanup();
@@ -374,7 +403,7 @@ bool CA2FFTServer::Initial()
 	}
 
 	//设置套接字为监听状态
-	if (listen(socketServer_, SOMAXCONN) < 0)
+	if (listen(m_socketServer_, SOMAXCONN) < 0)
 	{
 		LOG_ERROR(_T("设置监听状态失败!"));
 		WSACleanup();
@@ -385,14 +414,14 @@ bool CA2FFTServer::Initial()
 		LOG_INFO(_T("设置监听状态成功!"));
 	}
 
-	if (FAILED(audioCapture->Initial()))
+	if (FAILED(sm_pAudioCapture_->Initial()))
 	{
 		LOG_ERROR(_T("初始化CADataCapture失败!"));
 		return false;
 	}
 	LOG_INFO(_T("初始化CADataCapture成功!"));
 
-	if (FAILED(audioCapture->ExInitial()))
+	if (FAILED(sm_pAudioCapture_->ExInitial()))
 	{
 		LOG_ERROR(_T("CADataCapture::ExInitial失败!"));
 		return false;
@@ -402,7 +431,7 @@ bool CA2FFTServer::Initial()
 	return true;
 }
 
-unsigned int __stdcall CA2FFTServer::MainLoopService(PVOID pParam)
+unsigned int __stdcall CA2FFTServer::MainLoopService_(PVOID pParam)
 {
 	int skAddrLength = sizeof(SOCKADDR);
 	int len;
@@ -410,11 +439,11 @@ unsigned int __stdcall CA2FFTServer::MainLoopService(PVOID pParam)
 	std::string strout;
 	SOCKADDR_IN acceptAddr;
 	SOCKET socketClient;
-	while (control)
+	while (sm_control_)
 	{
-		if (clientNum < ((CA2FFTServer*)pParam)->maxClients_)
+		if (sm_clientNum_ < ((CA2FFTServer*)pParam)->m_maxClients_)
 		{
-			socketClient = accept(((CA2FFTServer*)pParam)->socketServer_,
+			socketClient = accept(((CA2FFTServer*)pParam)->m_socketServer_,
 				(SOCKADDR*)&acceptAddr, &skAddrLength);
 			if (socketClient == SOCKET_ERROR)
 			{
@@ -430,14 +459,14 @@ unsigned int __stdcall CA2FFTServer::MainLoopService(PVOID pParam)
 					{
 						wsHandshake(str, strout);
 						send(socketClient, (char*)(strout.c_str()), strout.size(), 0);
-						if (clientNum == 0)
+						if (sm_clientNum_ == 0)
 						{
-							audioCapture->Start();
+							sm_pAudioCapture_->Start();
 						}
-						clientNum++;
-						clientsMutex.lock();
-						clientsVector.push_back(socketClient);
-						clientsMutex.unlock();
+						sm_clientNum_++;
+						sm_clientsMutex_.lock();
+						sm_clientsVector_.push_back(socketClient);
+						sm_clientsMutex_.unlock();
 						LOG_INFO(_T("连接成功!"));
 					}
 					else
@@ -455,70 +484,70 @@ unsigned int __stdcall CA2FFTServer::MainLoopService(PVOID pParam)
 	return 0;
 }
 
-bool CA2FFTServer::StartMainLoopService()
+bool CA2FFTServer::StartMainLoopService_()
 {
-	mainLoopServiceHandle_ = (HANDLE)_beginthreadex(NULL, 0, MainLoopService, this, 0, &mainLoopServiceID_);
-	return (NULL != mainLoopServiceHandle_) ? true : false;
+	m_mainLoopServiceHandle_ = (HANDLE)_beginthreadex(NULL, 0, MainLoopService_, this, 0, &m_mainLoopServiceID_);
+	return (NULL != m_mainLoopServiceHandle_) ? true : false;
 }
 
-void CA2FFTServer::SendToClients(char* buffer)
+void CA2FFTServer::SendToClients_(char* buffer)
 {
 	int send_len = 0;
-	clientsMutex.lock();
-	std::vector<SOCKET>::iterator itr = clientsVector.begin();
-	while (itr != clientsVector.end())
+	sm_clientsMutex_.lock();
+	std::vector<SOCKET>::iterator itr = sm_clientsVector_.begin();
+	while (itr != sm_clientsVector_.end())
 	{
 		send_len = 0;
-		send_len = wsSend(*itr, buffer, SENDLENGTH * sizeof(float));
+		send_len = wsSend(*itr, buffer, sm_SendLength * sizeof(float));
 		if (send_len < 0)
 		{
 			//客户端断开连接
 			LOG_WARN(_T("断开连接!"));
-			if (clientNum == 1)
+			if (sm_clientNum_ == 1)
 			{
-				audioCapture->Stop();
+				sm_pAudioCapture_->Stop();
 			}
-			clientNum--;
+			sm_clientNum_--;
 			closesocket(*itr);
-			itr = clientsVector.erase(itr);
+			itr = sm_clientsVector_.erase(itr);
 		}
 		else
 		{
 			itr++;
 		}
 	}
-	clientsMutex.unlock();
+	sm_clientsMutex_.unlock();
 }
 
 
-unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
+unsigned int __stdcall CA2FFTServer::BufferSenderService_(PVOID pParam)
 {
 	//将buff区以float的形式读取
 	float* pfData;
-	//数据包定位符，将数据包的数据凑满dataSize个后进行处理
+	//数据包定位符，将数据包的数据凑满sm_DataSize_个后进行处理
 	UINT32 desPtn = 0;
 	UINT32 srcPtn = 0;
 	INT32 packRem = 0;
 	audiofft::AudioFFT fft;
-	fft.init(dataSize);
+	fft.init(sm_DataSize_);
 	std::vector<float> lData;
 	std::vector<float> rData;
 	std::vector<float> lRe;
 	std::vector<float> lImg;
 	std::vector<float> rRe;
 	std::vector<float> rImg;
-	lData.reserve(dataSize);
-	rData.reserve(dataSize);
-	lRe.resize(complexSize);
-	lImg.resize(complexSize);
-	rRe.resize(complexSize);
-	rImg.resize(complexSize);
+	lData.reserve(sm_DataSize_);
+	rData.reserve(sm_DataSize_);
+	lRe.resize(sm_ComplexSize_);
+	lImg.resize(sm_ComplexSize_);
+	rRe.resize(sm_ComplexSize_);
+	rImg.resize(sm_ComplexSize_);
 
 	//fft幅值
 	std::vector<float> lModel;
 	std::vector<float> rModel;
-	lModel.reserve(complexSize);
-	rModel.reserve(complexSize);
+	lModel.reserve(sm_ComplexSize_);
+	rModel.reserve(sm_ComplexSize_);
 	//临时变量
 	unsigned int j = 0;
 	float lSum = 0.0;
@@ -526,58 +555,58 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 
 	//循环更新数据后发送的操作
 	HRESULT hr;
-	while (control)
+	while (sm_control_)
 	{
 		//当有客户端连接时采集音频数据处理
-		if (clientNum > 0)
+		if (sm_clientNum_ > 0)
 		{
-			if (!audioCapture->IsChanging())
+			if (!sm_pAudioCapture_->IsChanging())
 			{
-				audioCapture->WaitBegin();
-				//发送缓冲区数据给所有的client
-				hr = audioCapture->get_NextPacketSize();
-				if (audioCapture->packetLength == 0)
+				sm_pAudioCapture_->WaitBegin();
+				hr = sm_pAudioCapture_->get_NextPacketSize();
+				if (sm_pAudioCapture_->GetPacketLength() == 0)
 				{
-					Sleep(INTERVAL);
+					Sleep(sm_Interval);
 					continue;
 				}
-				hr = audioCapture->get_Buffer();
-				packRem = desPtn + (audioCapture->numFramesAvailable) - dataSize;
-				pfData = (float*)(audioCapture->pData);
+				hr = sm_pAudioCapture_->get_Buffer();
+				packRem = desPtn + (sm_pAudioCapture_->GetNumFramesAvailable()) - sm_DataSize_;
+				sm_pAudioCapture_->GetData(&pfData);
+				//pfData = (float*)(sm_pAudioCapture_->pData);
 				if (packRem < 0)
 				{
-					for (unsigned int i = 0; i < (audioCapture->numFramesAvailable * 2); i += 2)
+					for (unsigned int i = 0; i < (sm_pAudioCapture_->GetNumFramesAvailable() * 2); i += 2)
 					{
 						lData.push_back(*(pfData + i));
 						rData.push_back(*(pfData + i + 1));
 					}
-					desPtn += audioCapture->numFramesAvailable;
+					desPtn += sm_pAudioCapture_->GetNumFramesAvailable();
 					srcPtn = 0;
 				}
 				else if (packRem > 0)
 				{
 					while (TRUE)
 					{
-						for (unsigned int i = 0; i < (dataSize - desPtn) * 2; i += 2)
+						for (unsigned int i = 0; i < (sm_DataSize_ - desPtn) * 2; i += 2)
 						{
 							lData.push_back(*(pfData + srcPtn + i));
 							rData.push_back(*(pfData + srcPtn + i + 1));
 						}
-						srcPtn += dataSize - desPtn;
+						srcPtn += sm_DataSize_ - desPtn;
 						desPtn = 0;
 						fft.fft(&lData[0], &lRe[0], &lImg[0]);
 						fft.fft(&rData[0], &rRe[0], &rImg[0]);
 						//数据压缩处理，非线性段求均值，单声道压缩至64个数据
 						j = 0;
-						for (unsigned int i = 0; i < MONOSENDLENGTH; i++)
+						for (unsigned int i = 0; i < sm_MonoSendLength; i++)
 						{
 							lSum = 0.0;
 							rSum = 0.0;
-							while (j < DataIndex[i])
+							while (j < sm_DataIndex[i])
 							{
-								if (j > complexSize - 1)
+								if (j > sm_ComplexSize_ - 1)
 								{
-									control = false;
+									sm_control_ = false;
 									return 1;
 								}
 								//取模
@@ -587,20 +616,20 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 								rSum += rModel.back();
 								j++;
 							}
-							lSendBuffer[i] = lSum / Gap[i];
-							rSendBuffer[i] = rSum / Gap[i];
+							sm_pLSendBuffer_[i] = lSum / sm_Gap[i];
+							sm_pRSendBuffer_[i] = rSum / sm_Gap[i];
 						}
 						//将压缩的数据拼凑至sendBuffer_
-						memcpy(sendBuffer, lSendBuffer, sizeof(float) * MONOSENDLENGTH);
-						memcpy((sendBuffer + MONOSENDLENGTH), rSendBuffer, sizeof(float) * MONOSENDLENGTH);
-						((CA2FFTServer*)pParam)->SendToClients((char*)sendBuffer);
+						memcpy(sm_pSendBuffer_, sm_pLSendBuffer_, sizeof(float) * sm_MonoSendLength);
+						memcpy((sm_pSendBuffer_ + sm_MonoSendLength), sm_pRSendBuffer_, sizeof(float) * sm_MonoSendLength);
+						((CA2FFTServer*)pParam)->SendToClients_((char*)sm_pSendBuffer_);
 						lData.clear();
 						rData.clear();
 						lModel.clear();
 						rModel.clear();
-						if (dataSize < packRem)
+						if (sm_DataSize_ < packRem)
 						{
-							packRem -= dataSize;
+							packRem -= sm_DataSize_;
 						}
 						else
 						{
@@ -617,7 +646,7 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 				}
 				else
 				{
-					for (unsigned int i = 0; i < audioCapture->numFramesAvailable * 2; i += 2)
+					for (unsigned int i = 0; i < sm_pAudioCapture_->GetNumFramesAvailable() * 2; i += 2)
 					{
 						lData.push_back(*(pfData + i));
 						rData.push_back(*(pfData + i + 1));
@@ -628,15 +657,15 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 					fft.fft(&rData[0], &rRe[0], &rImg[0]);
 					//数据压缩处理，非线性段求均值，单声道压缩至64个数据
 					j = 0;
-					for (unsigned int i = 0; i < MONOSENDLENGTH; i++)
+					for (unsigned int i = 0; i < sm_MonoSendLength; i++)
 					{
 						lSum = 0.0;
 						rSum = 0.0;
-						while (j < DataIndex[i])
+						while (j < sm_DataIndex[i])
 						{
-							if (j > complexSize - 1)
+							if (j > sm_ComplexSize_ - 1)
 							{
-								control = false;
+								sm_control_ = false;
 								return 1;
 							}
 							//取模
@@ -646,59 +675,59 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService(PVOID pParam)
 							rSum += rModel.back();
 							j++;
 						}
-						lSendBuffer[i] = lSum / Gap[i];
-						rSendBuffer[i] = rSum / Gap[i];
+						sm_pLSendBuffer_[i] = lSum / sm_Gap[i];
+						sm_pRSendBuffer_[i] = rSum / sm_Gap[i];
 					}
 					//将压缩的数据拼凑至sendBuffer_
-					memcpy(sendBuffer, lSendBuffer, sizeof(float) * MONOSENDLENGTH);
-					memcpy((sendBuffer + MONOSENDLENGTH), rSendBuffer, sizeof(float) * MONOSENDLENGTH);
-					((CA2FFTServer*)pParam)->SendToClients((char*)sendBuffer);
+					memcpy(sm_pSendBuffer_, sm_pLSendBuffer_, sizeof(float) * sm_MonoSendLength);
+					memcpy((sm_pSendBuffer_ + sm_MonoSendLength), sm_pRSendBuffer_, sizeof(float) * sm_MonoSendLength);
+					((CA2FFTServer*)pParam)->SendToClients_((char*)sm_pSendBuffer_);
 					lData.clear();
 					rData.clear();
 					lModel.clear();
 					rModel.clear();
 				}
-				audioCapture->ReleaseBuffer();
+				sm_pAudioCapture_->ReleaseBuffer();
 			}
 			else
 			{
-				audioCapture->WaitEnd();
-				Sleep(INTERVAL);
+				sm_pAudioCapture_->WaitEnd();
+				Sleep(sm_Interval);
 			}
 		}
 		else
 		{
-			Sleep(INTERVAL);
+			Sleep(sm_Interval);
 		}
 	}
 	return 0;
 }
 
-bool CA2FFTServer::StartBufferSenderService()
+bool CA2FFTServer::StartBufferSenderService_()
 {
-	bufferSenderServiceHandle_ = (HANDLE)_beginthreadex(NULL, 0, BufferSenderService,
-		this, 0, &bufferSenderServiceID_);
-	return (NULL != bufferSenderServiceHandle_) ? true : false;
+	m_bufferSenderServiceHandle_ = (HANDLE)_beginthreadex(NULL, 0, BufferSenderService_,
+		this, 0, &m_bufferSenderServiceID_);
+	return (NULL != m_bufferSenderServiceHandle_) ? true : false;
 }
 
 bool CA2FFTServer::StartServer()
 {
 	bool ret;
-	control = true;
-	if (!Initial())
+	sm_control_ = true;
+	if (!Initial_())
 	{
 		LOG_ERROR(_T("初始化失败!"));
 		return false;
 	}
 	LOG_INFO(_T("初始化成功!"));
-	ret = StartMainLoopService();
+	ret = StartMainLoopService_();
 	if (!ret)
 	{
 		LOG_ERROR(_T("开启主服务失败!"));
 		return false;
 	}
 	LOG_INFO(_T("开启主服务成功!"));
-	ret = StartBufferSenderService();
+	ret = StartBufferSenderService_();
 	if (!ret)
 	{
 		LOG_ERROR(_T("开启发送服务失败!"));
@@ -710,24 +739,24 @@ bool CA2FFTServer::StartServer()
 
 bool CA2FFTServer::ExitServer()
 {
-	control = false;
-	audioCapture->Stop();
-	clientsMutex.lock();
+	sm_control_ = false;
+	sm_pAudioCapture_->Stop();
+	sm_clientsMutex_.lock();
 	//关闭所有现有连接
-	std::vector<SOCKET>::iterator itr = clientsVector.begin();
-	while (itr != clientsVector.end())
+	std::vector<SOCKET>::iterator itr = sm_clientsVector_.begin();
+	while (itr != sm_clientsVector_.end())
 	{
 		closesocket(*itr);
 		itr++;
 	}
-	clientsVector.clear();
-	clientNum = 0;
-	CloseHandle(mainLoopServiceHandle_);
-	CloseHandle(bufferSenderServiceHandle_);
-	clientsMutex.unlock();
+	sm_clientsVector_.clear();
+	sm_clientNum_ = 0;
+	CloseHandle(m_mainLoopServiceHandle_);
+	CloseHandle(m_bufferSenderServiceHandle_);
+	sm_clientsMutex_.unlock();
 
 	//关闭套接字
-	closesocket(socketServer_);
+	closesocket(m_socketServer_);
 	return true;
 }
 
