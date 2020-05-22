@@ -114,7 +114,7 @@ var adv = new ADV_Plugin(IP, PORT);
 adv.ondata = function(audioData){ //do something with audioData...};
 ```
 
-参数`IP`可选值有`"any"`，或者是插件所在主机的的局域网`ip`地址（如`"192.168.1.107"`）。参数`"local"`会被解析为`"localhost"`;
+参数`IP`可选值有`"local"`，或者是插件所在主机的的局域网`ip`地址（如`"192.168.1.107"`）。参数`"local"`会被解析为`"localhost"`。
 
 每当客户端收到插件发送的频谱数据就会触发`ondata`事件。
 其中`audioData`是数据长度为`128`的数组，前面`64`个数据为左声道FFT数据，后面`64`个数据为右声道FFT数据。每一个声道的FFT数据位从低到高对应频谱频率的由低到高。
