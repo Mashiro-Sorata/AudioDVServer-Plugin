@@ -13,7 +13,7 @@
 
 #define VER_MAJOR    1
 #define VER_MINOR    2
-#define VER_SUBMINOR 1
+#define VER_SUBMINOR 2
 #define VER_RESERVED 0
 
 #define VER_REV                 VER_MAJOR, VER_MINOR, VER_SUBMINOR, VER_RESERVED

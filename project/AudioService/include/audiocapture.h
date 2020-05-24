@@ -5,8 +5,12 @@
 
 #include <Audioclient.h>
 #include <mmdeviceapi.h>
+#include <mutex>
+
+
 
 #define REFTIMES_PER_SEC  10000000
+
 
 
 class CADataCapture : public IMMNotificationClient
@@ -16,20 +20,22 @@ public:
 	~CADataCapture();
 
 	HRESULT Initial();
-	HRESULT ExInitial();
+	bool StartExInitialService();
 	HRESULT Start();
 	HRESULT Stop();
-	HRESULT get_NextPacketSize();
-	HRESULT get_Buffer();
+	HRESULT Reset();
+	HRESULT GetNextPacketSize();
+	HRESULT GetBuffer(float** dataBuff);
 	HRESULT ReleaseBuffer();
-	void WaitBegin();
-	void WaitEnd();
 	bool IsChanging();
+	bool ReStart();
 
 	UINT32 GetNumFramesAvailable();
 	UINT32 GetPacketLength();
 	DWORD GetFlags();
-	void GetData(float** dataBuff);
+
+	//主应用在使用pCaptureClient时lock
+	static std::mutex sm_mutexWait;
 
 public:
 	// IUnknown
@@ -45,6 +51,9 @@ public:
 	HRESULT STDMETHODCALLTYPE OnPropertyValueChanged(_In_  LPCWSTR pwstrDeviceId, _In_  const PROPERTYKEY key) override;
 
 private:
+	HRESULT ExInitial_();
+	static unsigned int __stdcall ExInitialService_(PVOID pParam);
+
 	ULONG m_referenceCount_ = 0;
 
 	IMMDeviceEnumerator* m_pEnumerator_;
@@ -57,13 +66,10 @@ private:
 
 	UINT32 m_numFramesAvailable_;
 	UINT32 m_packetLength_;
-	BYTE* m_pData_;
 	DWORD m_flags_;
 
 	//主应用处于开始状态时将start置为true
 	bool m_start_;
-	//主应用在使用pCaptureClient时将wait置为true
-	bool m_wait_;
 	//当默认设备改变重新设置的过程中changing为true
 	bool m_changing_;
 };

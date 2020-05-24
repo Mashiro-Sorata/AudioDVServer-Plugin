@@ -339,14 +339,7 @@ CA2FFTServer::CA2FFTServer()
 
 CA2FFTServer::~CA2FFTServer()
 {
-	sm_pAudioCapture_->Stop();
-	sm_clientsMutex_.lock();
-	CloseHandle(m_mainLoopServiceHandle_);
-	CloseHandle(m_bufferSenderServiceHandle_);
-	sm_clientsMutex_.unlock();
-	//关闭套接字
-	closesocket(m_socketServer_);
-
+	ExitServer();
 	delete[] sm_pSendBuffer_;
 	delete[] sm_pLSendBuffer_;
 	delete[] sm_pRSendBuffer_;
@@ -367,20 +360,21 @@ bool CA2FFTServer::Initial_()
 
 	//初始化Windows Sockets DLL
 	if (WSAStartup(w_req, &wsadata) != 0) {
-		LOG_ERROR(_T("初始化套接字库失败!"));
+		LOG_ERROR("初始化套接字库失败!");
 		return false;
 	}
 	else
 	{
-		LOG_INFO(_T("初始化套接字库成功!"));
+		LOG_INFO("初始化套接字库成功!");
 	}
+
 	//检测版本号
 	if (LOBYTE(wsadata.wVersion) != 2 || HIBYTE(wsadata.wHighVersion) != 2) {
-		LOG_WARN(_T("套接字库版本号不符!"));
+		LOG_WARN("套接字库版本号不符!");
 	}
 	else
 	{
-		LOG_INFO(_T("套接字库版本正确!"));
+		LOG_INFO("套接字库版本正确!");
 	}
 
 	//创建套接字
@@ -393,42 +387,44 @@ bool CA2FFTServer::Initial_()
 
 	if (bind(m_socketServer_, (SOCKADDR*)&m_serverAddr_, sizeof(SOCKADDR)) == SOCKET_ERROR)
 	{
-		LOG_ERROR(_T("套接字绑定失败!"));
+		LOG_ERROR("套接字绑定失败!");
 		WSACleanup();
 		return false;
 	}
 	else
 	{
-		LOG_INFO(_T("套接字绑定成功!"));
+		LOG_INFO("套接字绑定成功!");
 	}
 
 	//设置套接字为监听状态
 	if (listen(m_socketServer_, SOMAXCONN) < 0)
 	{
-		LOG_ERROR(_T("设置监听状态失败!"));
+		LOG_ERROR("设置监听状态失败!");
 		WSACleanup();
 		return false;
 	}
 	else
 	{
-		LOG_INFO(_T("设置监听状态成功!"));
+		LOG_INFO("设置监听状态成功!");
 	}
 
 	if (FAILED(sm_pAudioCapture_->Initial()))
 	{
-		LOG_ERROR(_T("初始化CADataCapture失败!"));
+		LOG_ERROR("初始化CADataCapture失败!");
 		return false;
 	}
-	LOG_INFO(_T("初始化CADataCapture成功!"));
+	LOG_INFO("初始化CADataCapture成功!");
 
-	if (FAILED(sm_pAudioCapture_->ExInitial()))
+	if (sm_pAudioCapture_->StartExInitialService())
 	{
-		LOG_ERROR(_T("CADataCapture::ExInitial失败!"));
+		LOG_INFO("CADataCapture::ExInitial成功!");
+		return true;
+	}
+	else
+	{
+		LOG_ERROR("CADataCapture::ExInitial失败!");
 		return false;
 	}
-	LOG_INFO(_T("CADataCapture::ExInitial成功!"));
-
-	return true;
 }
 
 unsigned int __stdcall CA2FFTServer::MainLoopService_(PVOID pParam)
@@ -447,7 +443,7 @@ unsigned int __stdcall CA2FFTServer::MainLoopService_(PVOID pParam)
 				(SOCKADDR*)&acceptAddr, &skAddrLength);
 			if (socketClient == SOCKET_ERROR)
 			{
-				LOG_WARN(_T("尝试连接失败!"));
+				LOG_WARN("建立连接失败!");
 			}
 			else
 			{
@@ -467,16 +463,16 @@ unsigned int __stdcall CA2FFTServer::MainLoopService_(PVOID pParam)
 						sm_clientsMutex_.lock();
 						sm_clientsVector_.push_back(socketClient);
 						sm_clientsMutex_.unlock();
-						LOG_INFO(_T("连接成功!"));
+						LOG_INFO("客户端连接成功!");
 					}
 					else
 					{
-						LOG_WARN(_T("WebSocket握手失败!"));
+						LOG_WARN("WebSocket握手失败!");
 					}
 				}
 				else
 				{
-					LOG_WARN(_T("数据接受失败!"));
+					LOG_WARN("连接时数据接受失败!");
 				}
 			}
 		}
@@ -502,7 +498,7 @@ void CA2FFTServer::SendToClients_(char* buffer)
 		if (send_len < 0)
 		{
 			//客户端断开连接
-			LOG_WARN(_T("断开连接!"));
+			LOG_WARN("客户端断开连接!");
 			if (sm_clientNum_ == 1)
 			{
 				sm_pAudioCapture_->Stop();
@@ -523,7 +519,7 @@ void CA2FFTServer::SendToClients_(char* buffer)
 unsigned int __stdcall CA2FFTServer::BufferSenderService_(PVOID pParam)
 {
 	//将buff区以float的形式读取
-	float* pfData;
+	float* pfData = NULL;
 	//数据包定位符，将数据包的数据凑满sm_DataSize_个后进行处理
 	UINT32 desPtn = 0;
 	UINT32 srcPtn = 0;
@@ -553,47 +549,103 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService_(PVOID pParam)
 	float lSum = 0.0;
 	float rSum = 0.0;
 
+	unsigned int errCount = 0;
+
 	//循环更新数据后发送的操作
 	HRESULT hr;
 	while (sm_control_)
 	{
-		//当有客户端连接时采集音频数据处理
-		if (sm_clientNum_ > 0)
+		//当有客户端连接时采集音频数据处理或默认音频设备未发生改变时采集音频数据处理
+		if ((sm_clientNum_ > 0) && (!sm_pAudioCapture_->IsChanging()))
 		{
-			if (!sm_pAudioCapture_->IsChanging())
+			sm_pAudioCapture_->sm_mutexWait.lock();
+			hr = sm_pAudioCapture_->GetNextPacketSize();
+			if (!FAILED(hr) && (0 != sm_pAudioCapture_->GetPacketLength()))
 			{
-				sm_pAudioCapture_->WaitBegin();
-				hr = sm_pAudioCapture_->get_NextPacketSize();
-				if (sm_pAudioCapture_->GetPacketLength() == 0)
+				hr = sm_pAudioCapture_->GetBuffer(&pfData);
+				if (!FAILED(hr))
 				{
-					Sleep(sm_Interval);
-					continue;
-				}
-				hr = sm_pAudioCapture_->get_Buffer();
-				packRem = desPtn + (sm_pAudioCapture_->GetNumFramesAvailable()) - sm_DataSize_;
-				sm_pAudioCapture_->GetData(&pfData);
-				//pfData = (float*)(sm_pAudioCapture_->pData);
-				if (packRem < 0)
-				{
-					for (unsigned int i = 0; i < (sm_pAudioCapture_->GetNumFramesAvailable() * 2); i += 2)
+					packRem = desPtn + (sm_pAudioCapture_->GetNumFramesAvailable()) - sm_DataSize_;
+					if (packRem < 0)
 					{
-						lData.push_back(*(pfData + i));
-						rData.push_back(*(pfData + i + 1));
-					}
-					desPtn += sm_pAudioCapture_->GetNumFramesAvailable();
-					srcPtn = 0;
-				}
-				else if (packRem > 0)
-				{
-					while (TRUE)
-					{
-						for (unsigned int i = 0; i < (sm_DataSize_ - desPtn) * 2; i += 2)
+						for (unsigned int i = 0; i < sm_pAudioCapture_->GetNumFramesAvailable() * 2; i += 2)
 						{
-							lData.push_back(*(pfData + srcPtn + i));
-							rData.push_back(*(pfData + srcPtn + i + 1));
+							lData.push_back(*(pfData + i));
+							rData.push_back(*(pfData + i + 1));
 						}
-						srcPtn += sm_DataSize_ - desPtn;
+						desPtn += sm_pAudioCapture_->GetNumFramesAvailable();
+						srcPtn = 0;
+					}
+					else if (packRem > 0)
+					{
+						while (TRUE)
+						{
+							for (unsigned int i = 0; i < (sm_DataSize_ - desPtn) * 2; i += 2)
+							{
+								lData.push_back(*(pfData + srcPtn + i));
+								rData.push_back(*(pfData + srcPtn + i + 1));
+							}
+							srcPtn += sm_DataSize_ - desPtn;
+							desPtn = 0;
+							fft.fft(&lData[0], &lRe[0], &lImg[0]);
+							fft.fft(&rData[0], &rRe[0], &rImg[0]);
+							//数据压缩处理，非线性段求均值，单声道压缩至64个数据
+							j = 0;
+							for (unsigned int i = 0; i < sm_MonoSendLength; i++)
+							{
+								lSum = 0.0;
+								rSum = 0.0;
+								while (j < sm_DataIndex[i])
+								{
+									if (j > sm_ComplexSize_ - 1)
+									{
+										sm_control_ = false;
+										return 1;
+									}
+									//取模
+									lModel.push_back(sqrt(lRe[j] * lRe[j] + lImg[j] * lImg[j]));
+									rModel.push_back(sqrt(rRe[j] * rRe[j] + rImg[j] * rImg[j]));
+									lSum += lModel.back();
+									rSum += rModel.back();
+									j++;
+								}
+								sm_pLSendBuffer_[i] = lSum / sm_Gap[i];
+								sm_pRSendBuffer_[i] = rSum / sm_Gap[i];
+							}
+							//将压缩的数据拼凑至sendBuffer_
+							memcpy(sm_pSendBuffer_, sm_pLSendBuffer_, sizeof(float) * sm_MonoSendLength);
+							memcpy((sm_pSendBuffer_ + sm_MonoSendLength), sm_pRSendBuffer_, sizeof(float) * sm_MonoSendLength);
+							((CA2FFTServer*)pParam)->SendToClients_((char*)sm_pSendBuffer_);
+							lData.clear();
+							rData.clear();
+							lModel.clear();
+							rModel.clear();
+							if (sm_DataSize_ < packRem)
+							{
+								packRem -= sm_DataSize_;
+							}
+							else
+							{
+								break;
+							}
+						}
+						for (unsigned int i = 0; i < packRem * 2; i += 2)
+						{
+							lData.push_back(*(pfData + i));
+							rData.push_back(*(pfData + i + 1));
+						}
+						desPtn += packRem;
+						srcPtn = 0;
+					}
+					else
+					{
+						for (unsigned int i = 0; i < (sm_pAudioCapture_->GetNumFramesAvailable()) * 2; i += 2)
+						{
+							lData.push_back(*(pfData + i));
+							rData.push_back(*(pfData + i + 1));
+						}
 						desPtn = 0;
+						srcPtn = 0;
 						fft.fft(&lData[0], &lRe[0], &lImg[0]);
 						fft.fft(&rData[0], &rRe[0], &rImg[0]);
 						//数据压缩处理，非线性段求均值，单声道压缩至64个数据
@@ -627,73 +679,54 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService_(PVOID pParam)
 						rData.clear();
 						lModel.clear();
 						rModel.clear();
-						if (sm_DataSize_ < packRem)
-						{
-							packRem -= sm_DataSize_;
-						}
-						else
-						{
-							break;
-						}
 					}
-					for (unsigned int i = 0; i < packRem * 2; i += 2)
-					{
-						lData.push_back(*(pfData + i));
-						rData.push_back(*(pfData + i + 1));
-					}
-					desPtn += packRem;
-					srcPtn = 0;
 				}
 				else
 				{
-					for (unsigned int i = 0; i < sm_pAudioCapture_->GetNumFramesAvailable() * 2; i += 2)
+					if (10 == errCount)
 					{
-						lData.push_back(*(pfData + i));
-						rData.push_back(*(pfData + i + 1));
+						sm_pAudioCapture_->ReStart();
+						errCount = 0;
 					}
-					desPtn = 0;
-					srcPtn = 0;
-					fft.fft(&lData[0], &lRe[0], &lImg[0]);
-					fft.fft(&rData[0], &rRe[0], &rImg[0]);
-					//数据压缩处理，非线性段求均值，单声道压缩至64个数据
-					j = 0;
-					for (unsigned int i = 0; i < sm_MonoSendLength; i++)
+					else
 					{
-						lSum = 0.0;
-						rSum = 0.0;
-						while (j < sm_DataIndex[i])
+						++errCount;
+						switch (hr)
 						{
-							if (j > sm_ComplexSize_ - 1)
-							{
-								sm_control_ = false;
-								return 1;
-							}
-							//取模
-							lModel.push_back(sqrt(lRe[j] * lRe[j] + lImg[j] * lImg[j]));
-							rModel.push_back(sqrt(rRe[j] * rRe[j] + rImg[j] * rImg[j]));
-							lSum += lModel.back();
-							rSum += rModel.back();
-							j++;
+						case(AUDCLNT_S_BUFFER_EMPTY):
+							LOG_WARN("AUDCLNT_S_BUFFER_EMPTY(没有捕获数据可读取)");
+							break;
+						case(AUDCLNT_E_BUFFER_ERROR):
+							LOG_WARN("AUDCLNT_E_BUFFER_ERROR(无法检索数据缓冲区,指针指向NULL)");
+							sm_pAudioCapture_->Stop();
+							sm_pAudioCapture_->Reset();
+							sm_pAudioCapture_->Start();
+							break;
+						case(AUDCLNT_E_OUT_OF_ORDER):
+							LOG_WARN("AUDCLNT_E_OUT_OF_ORDER(未释放数据缓冲区,先前的GetBuffer调用仍然有效)");
+							break;
+						case(AUDCLNT_E_DEVICE_INVALIDATED):
+							LOG_WARN("AUDCLNT_E_DEVICE_INVALIDATED(音频终结点设备已拔出,或者音频硬件或关联的硬件资源已重新配置,禁用,删除或以其他方式变得无法使用)");
+							break;
+						case(AUDCLNT_E_BUFFER_OPERATION_PENDING):
+							LOG_WARN("AUDCLNT_E_BUFFER_OPERATION_PENDING(由于正在进行流重置,因此无法访问缓冲区)");
+							break;
+						case(AUDCLNT_E_SERVICE_NOT_RUNNING):
+							LOG_WARN("AUDCLNT_E_SERVICE_NOT_RUNNING(Windows音频服务未运行)");
+							break;
+						case(E_POINTER):
+							LOG_WARN("E_POINTER(参数ppData,pNumFramesToRead或pdwFlags为NULL)");
+							break;
+						default:
+							LOG_WARN("E_UNKNOW(获取数据缓冲区时发生未知错误)");
 						}
-						sm_pLSendBuffer_[i] = lSum / sm_Gap[i];
-						sm_pRSendBuffer_[i] = rSum / sm_Gap[i];
+						Sleep(sm_Interval);
 					}
-					//将压缩的数据拼凑至sendBuffer_
-					memcpy(sm_pSendBuffer_, sm_pLSendBuffer_, sizeof(float) * sm_MonoSendLength);
-					memcpy((sm_pSendBuffer_ + sm_MonoSendLength), sm_pRSendBuffer_, sizeof(float) * sm_MonoSendLength);
-					((CA2FFTServer*)pParam)->SendToClients_((char*)sm_pSendBuffer_);
-					lData.clear();
-					rData.clear();
-					lModel.clear();
-					rModel.clear();
 				}
 				sm_pAudioCapture_->ReleaseBuffer();
+				pfData = NULL;
 			}
-			else
-			{
-				sm_pAudioCapture_->WaitEnd();
-				Sleep(sm_Interval);
-			}
+			sm_pAudioCapture_->sm_mutexWait.unlock();
 		}
 		else
 		{
@@ -716,31 +749,38 @@ bool CA2FFTServer::StartServer()
 	sm_control_ = true;
 	if (!Initial_())
 	{
-		LOG_ERROR(_T("初始化失败!"));
+		LOG_ERROR("初始化失败!");
 		return false;
 	}
-	LOG_INFO(_T("初始化成功!"));
+	LOG_INFO("初始化成功!");
 	ret = StartMainLoopService_();
 	if (!ret)
 	{
-		LOG_ERROR(_T("开启主服务失败!"));
+		LOG_ERROR("开启主服务失败!");
 		return false;
 	}
-	LOG_INFO(_T("开启主服务成功!"));
+	LOG_INFO("开启主服务成功!");
 	ret = StartBufferSenderService_();
 	if (!ret)
 	{
-		LOG_ERROR(_T("开启发送服务失败!"));
+		LOG_ERROR("开启发送服务失败!");
 		return false;
 	}
-	LOG_INFO(_T("开启发送服务成功!"));
+	LOG_INFO("开启发送服务成功!");
 	return true;
 }
 
 bool CA2FFTServer::ExitServer()
 {
 	sm_control_ = false;
+	DWORD _ret = WaitForSingleObject(m_bufferSenderServiceHandle_, 5000);
+	if (WAIT_OBJECT_0 != _ret)
+	{
+		LOG_WARN("强制关闭BufferSenderService");
+		CloseHandle(m_bufferSenderServiceHandle_);
+	}
 	sm_pAudioCapture_->Stop();
+
 	sm_clientsMutex_.lock();
 	//关闭所有现有连接
 	std::vector<SOCKET>::iterator itr = sm_clientsVector_.begin();
@@ -752,7 +792,6 @@ bool CA2FFTServer::ExitServer()
 	sm_clientsVector_.clear();
 	sm_clientNum_ = 0;
 	CloseHandle(m_mainLoopServiceHandle_);
-	CloseHandle(m_bufferSenderServiceHandle_);
 	sm_clientsMutex_.unlock();
 
 	//关闭套接字

@@ -69,24 +69,25 @@ long CAudioDVServer::OnInitial()
     srv_ip = new char[17];
     ReadConfig(&srv_ip, &srv_port, &srv_maxconn, &srv_logger);
     LOG_INIT(srv_logger);
-    LOG_INFO(_T("Initial CAudioDVServer!"));
+    LOG_INFO("Initial CAudioDVServer!");
     LOG_BASE("Server Address", srv_ip);
+    LOG_BASE("Server Port", srv_port);
+    LOG_BASE("Server Maxconn", srv_maxconn);
     audioServer = new CA2FFTServer(srv_ip, srv_port, srv_maxconn);
     return PluginImpl::OnInitial();
 }
 
 long CAudioDVServer::OnRelease()
 {
-    audioServer->ExitServer();
     delete[] srv_ip;
     delete audioServer;
-    LOG_INFO(_T("Exit CAudioDVServer!"));
+    LOG_INFO("Exit CAudioDVServer!");
     return PluginImpl::OnRelease();
 }
 
 long CAudioDVServer::OnReady()
 {
-    LOG_INFO(_T("Start CAudioDVServer!"));
+    LOG_INFO("Start CAudioDVServer!");
     audioServer->StartServer();
     return PluginImpl::OnReady();
 }

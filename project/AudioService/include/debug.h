@@ -6,16 +6,17 @@
 #include <windows.h>
 #include <iostream>
 #define MAX_CHAR_LENGTH 256
-#define _T(x) x
 
 
 void String2TCHAR(const std::string _str, TCHAR* tchar);
 void GetInstanceFolderPath(std::string* dirPath);
 
 //调试开关
-#define DEBUG_SWITCH
+//#define DEBUG_SWITCH
 
 #ifdef DEBUG_SWITCH
+
+#include<mutex>
 
 // 日志类型: 
 // LOGGER_TYPE_FILE = 文件输出
@@ -25,13 +26,15 @@ void GetInstanceFolderPath(std::string* dirPath);
 #define LOGGER_TYPE_CONSOLE 1
 #define LOGGER_TYPE_NEROUT 2
 
+//选择日志输出方式
 #define LOGGER_TYPE LOGGER_TYPE_FILE
+
 
 #if LOGGER_TYPE==LOGGER_TYPE_FILE
 
 #include <fstream>
 
-#elif LOGGER_TYPE ==LOGGER_TYPE_NEROUT
+#elif LOGGER_TYPE==LOGGER_TYPE_NEROUT
 
 #include <NERvGear/NERvSDK.h>
 #include "../include/defs.h"
@@ -43,7 +46,7 @@ namespace debug
 	enum class LEVEL { _ERROR_ = 0, _WARN_ = 1, _INFO_ = 2, _DEBUG_ = 3, _ALL_ = 4 };
 
 	//控制输出等级
-	const debug::LEVEL DebugLevel(LEVEL::_ALL_);
+	const LEVEL DebugLevel(LEVEL::_ALL_);
 
 	class CLogger
 	{
@@ -77,6 +80,7 @@ namespace debug
 		bool m_flag_;
 		static const LEVEL sm_maxLevel_;
 		SYSTEMTIME m_now_;
+		static std::mutex m_logMutex_;
 	};
 
 	template<typename T>
@@ -89,12 +93,15 @@ namespace debug
 			std::string _headLog;
 			_headLog.append("<");
 			_itoa_s(m_now_.wHour, sdata, 10);
+			_headLog.append(2 - strlen(sdata), '0');
 			_headLog.append(sdata);
 			_headLog.append(":");
 			_itoa_s(m_now_.wMinute, sdata, 10);
+			_headLog.append(2 - strlen(sdata), '0');
 			_headLog.append(sdata);
 			_headLog.append(":");
 			_itoa_s(m_now_.wSecond, sdata, 10);
+			_headLog.append(2 - strlen(sdata), '0');
 			_headLog.append(sdata);
 			_headLog.append(">");
 			_headLog.append("[");
@@ -104,6 +111,7 @@ namespace debug
 			_headLog.append(")>>>>");
 			_headLog.append(name);
 			_headLog.append(": ");
+			m_logMutex_.lock();
 #if LOGGER_TYPE==LOGGER_TYPE_FILE
 
 			(*m_outfile_) << _headLog << format << std::endl;
@@ -117,6 +125,7 @@ namespace debug
 			Log2Ner_(level, _headLog, format);
 
 #endif
+			m_logMutex_.unlock();
 		}
 		
 	}

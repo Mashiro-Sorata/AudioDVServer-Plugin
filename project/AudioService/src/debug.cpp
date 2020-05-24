@@ -48,6 +48,8 @@ const std::string debug::CLogger::sm_fileName_ = "ADV_Log.log";
 
 const debug::LEVEL debug::CLogger::sm_maxLevel_ = debug::DebugLevel;
 
+std::mutex debug::CLogger::m_logMutex_;
+
 debug::CLogger::CLogger()
 {
 	m_flag_ = false;
