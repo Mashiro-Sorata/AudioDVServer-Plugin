@@ -552,15 +552,15 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService_(PVOID pParam)
 	unsigned int errCount = 0;
 
 	//循环更新数据后发送的操作
-	HRESULT hr;
+	HRESULT hr = S_OK;
 	while (sm_control_)
 	{
 		//当有客户端连接时采集音频数据处理或默认音频设备未发生改变时采集音频数据处理
 		if ((sm_clientNum_ > 0) && (!sm_pAudioCapture_->IsChanging()))
 		{
 			sm_pAudioCapture_->sm_mutexWait.lock();
-			hr = sm_pAudioCapture_->GetNextPacketSize();
-			if (!FAILED(hr) && (0 != sm_pAudioCapture_->GetPacketLength()))
+			sm_pAudioCapture_->GetNextPacketSize();
+			if (0 != sm_pAudioCapture_->GetPacketLength())
 			{
 				hr = sm_pAudioCapture_->GetBuffer(&pfData);
 				if (!FAILED(hr))
@@ -720,15 +720,22 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService_(PVOID pParam)
 						default:
 							LOG_WARN("E_UNKNOW(获取数据缓冲区时发生未知错误)");
 						}
-						Sleep(sm_Interval);
 					}
+					Sleep(sm_Interval);
 				}
 				sm_pAudioCapture_->ReleaseBuffer();
 				pfData = NULL;
 			}
+			else
+			{
+				Sleep(sm_Interval);
+			}
 			sm_pAudioCapture_->sm_mutexWait.unlock();
 		}
-		Sleep(sm_Interval);
+		else
+		{
+			Sleep(sm_Interval);
+		}
 	}
 	return 0;
 }
