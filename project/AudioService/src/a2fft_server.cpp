@@ -728,10 +728,7 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService_(PVOID pParam)
 			}
 			sm_pAudioCapture_->sm_mutexWait.unlock();
 		}
-		else
-		{
-			Sleep(sm_Interval);
-		}
+		Sleep(sm_Interval);
 	}
 	return 0;
 }

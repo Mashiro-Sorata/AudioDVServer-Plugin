@@ -12,7 +12,7 @@ void String2TCHAR(const std::string _str, TCHAR* tchar);
 void GetInstanceFolderPath(std::string* dirPath);
 
 //µ÷ÊÔ¿ª¹Ø
-//#define DEBUG_SWITCH
+#define DEBUG_SWITCH
 
 #ifdef DEBUG_SWITCH
 
