@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<?xml version="1.0" encoding="utf-8"?>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAO Utils音频可视化网页客户端插件</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            text-align: center;
+            height: 100%; 
+            width: 100%;
+        }
+        #cvs { display: block; }
+    </style>
+</head>
+
+<body>
+    <canvas id="cvs"></canvas>
+    <script src="../ADVService.js"></script>
+    <script>
+        var settings = { 
+            ip: "local",
+            port: 5050,
+            //主颜色
+            color: "rgba(0,0,0,0.6)",
+            lineWidth: 4,
+            //光晕色彩
+            blurColor: "red",
+            //旋转设置
+            rotateFlag: false,
+            //音频取样范围设置
+            start: 0,
+            end: 64,
+            channel: 2,
+            //最大动态范围(0-1)
+            maxRange: 1
+		};
+
+        //引用插件
+        var adv = new ADV_Plugin(settings.ip, settings.port);
+
+        //画布
+        var cvs = document.getElementById("cvs");
+        var ctx = cvs.getContext("2d");
+
+        var minLength = Math.min(window.innerWidth, window.innerHeight);
+        var ratio = minLength * 0.1 * settings.maxRange;
+        //自适应
+        window.onresize = function () {  
+            cvs.width = window.innerWidth;  
+            cvs.height = window.innerHeight;
+            minLength = Math.min(window.innerWidth, window.innerHeight);
+            ctx.lineWidth = settings.lineWidth;
+            ctx.strokeStyle = settings.color;
+            ratio = minLength * 0.1 * settings.maxRange;
+            peakValue = ratio;
+            // 以下设置CPU占用很高，慎用
+            // ctx.shadowBlur = 2;
+            // ctx.shadowColor = settings.blurColor;
+        };  
+        window.onresize();
+
+        //Global Vars
+        var outerPos = [];
+        var innerPos = [];
+        var degUnit = Math.PI/180;
+        var offsetAngle = 0;
+        var dotGap = 360/settings.channel/(settings.end - settings.start);
+        var audioData = new Array((settings.end - settings.start)*settings.channel);
+        var animeData = new Array((settings.end - settings.start)*settings.channel);
+        var peakValue = ratio;
+        
+        //initial
+        for(var i=0; i<animeData.length; i++) {
+            audioData[i] = animeData[i] = 0;
+        }
+
+        //调用事件接口更新数据
+        adv.ondata = function (data){
+            //数据归一化
+            var max = 0;
+            for(var j=0;j<settings.channel;j++) {
+                for(var i=j*64+settings.start; i<j*64+settings.end; i++) {
+                    if(data[i] > max) 
+                        max = data[i];
+                }
+            }
+            peakValue = peakValue * 0.99 + max * 0.01;
+
+            for(var j=0; j<settings.channel; j++) {
+                for(var i=0; i<(settings.end-settings.start); i++) {
+                    audioData[i+j*(settings.end - settings.start)] = data[settings.start+i+j*64] / peakValue;
+                }
+            }
+        };
+
+        function getPos(r, deg) {
+            return [cvs.width/2+Math.cos(deg)*r,cvs.height/2+Math.sin(deg)*r];
+        }
+
+        function createPoint() {
+            outerPos = [];
+            innerPos = [];
+            var deg, deltaR, r1, r2;
+            for(var j=0; j<settings.channel; j++) {
+                for(var i=0; i<(settings.end - settings.start); i++) {
+                    deg = degUnit*((i+j*(settings.end - settings.start))*dotGap + offsetAngle);
+                    deltaR = animeData[i+j*(settings.end - settings.start)] * ratio;
+                    r1 = 0.8*minLength/2+deltaR+1;
+                    r2 = 0.8*minLength/2-deltaR-1;
+                    outerPos.push(getPos(r1,deg));
+                    innerPos.push(getPos(r2,deg));
+                }
+                if(settings.rotateFlag) {
+                    offsetAngle += 0.05;
+                    if(offsetAngle>=360)
+                        offsetAngle = 0;
+                }
+            }
+        }
+
+        //更新画面
+        function frame() {
+            for(var i=0; i<audioData.length; i++) {
+                animeData[i] += (audioData[i] - animeData[i]) * 0.3
+                animeData[i] = Math.min(animeData[i], 1);
+            }
+
+            createPoint();
+            //清空画布
+            ctx.clearRect(0, 0, cvs.width, cvs.height);
+            
+            //分别为调整水平线倾斜角度,频谱倾斜角度,旋转角度
+            //ctx.transform(1, 5 * (Math.PI / 180), 0, 1, 0, 0);
+            //ctx.transform(0.9645, 0, -9 * (Math.PI / 180), 1, 0, 0);
+            //ctx.rotate(7 * (Math.PI / 180));
+
+            ctx.beginPath();
+            for(var i=0; i<audioData.length; i++) {
+                ctx.moveTo(outerPos[i][0], outerPos[i][1]);
+                ctx.lineTo(innerPos[i][0], innerPos[i][1]);
+            }
+            ctx.closePath();
+            ctx.stroke();
+            // ctx.resetTransform();
+            window.requestAnimationFrame(frame);
+        }
+        window.requestAnimationFrame(frame);
+    </script>
+</body>
+
+</html>

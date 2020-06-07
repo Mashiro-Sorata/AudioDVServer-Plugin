@@ -41,17 +41,3 @@ var ADV_Plugin = (function(){
 
 })();
 
-//窗口自适应
-window.onresize = function () {
-            if (window.innerWidth / window.innerHeight > 1.8333333333333) {
-                display.width = window.innerWidth;
-                display.height = window.innerWidth / 1980 * 1080;
-
-                window.scrollTo(0, (window.innerHeight - 123) / 16);
-            } else {
-                display.width = window.innerHeight / 1080 * 1980;
-                display.height = window.innerHeight;
-            }
-        }
-
-window.onresize();
