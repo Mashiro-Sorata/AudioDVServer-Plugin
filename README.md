@@ -1,4 +1,4 @@
-<div align="center"><h1>ADV-Plugin</h1></div>
+<div align="center"><h1>ADVServer-Plugin</h1></div>
 
 <div align="center"><img src="https://github.com/Mashiro-Sorata/ADV-Plugin/blob/master/Image/ADV_demo.png?raw=true"></div>
 <div align="center">Powered By <a href="http://mashirosorata.vicp.io">Mashiro_Sorata</a></div>
@@ -18,7 +18,7 @@
 
 <h2 id="u1">简介</h2>
 
-`ADV-Plugin`是[SAO Utils](http://sao.gpbeta.com/)的第三方插件，可以提供系统音频数据的可视化服务。安装启用插件后，仅需用SAO Utils的“桌面网页挂件”打开ADV网页客户端即可显示系统音频频谱。网页客户端可由用户自行编写改变其样式，此插件则为客户端提供数据接口(详见[开发接口/API](#u5))。下载后的插件压缩包内提供了一个简单的网页客户端演示Demo，用户可自行修改其样式。
+`AudioDVServer-Plugin`是[SAO Utils](http://sao.gpbeta.com/)的第三方插件，可以提供系统音频数据的可视化服务。安装启用插件后，仅需用SAO Utils的“桌面网页挂件”打开ADV网页客户端即可显示系统音频频谱。网页客户端可由用户自行编写改变其样式，此插件则为客户端提供数据接口(详见[开发接口/API](#u5))。下载后的插件压缩包内提供了一个简单的网页客户端演示Demo，用户可自行修改其样式。
 
 ### 视频演示
 [桌面音频可视化插件演示](https://www.bilibili.com/video/BV1uf4y1U7Tx)
@@ -35,14 +35,22 @@
 
 <h2 id="u2">下载</h2>
 
-下载最新版本的插件：[ADV_Plug-in.zip](https://github.com/Mashiro-Sorata/ADV-Plugin/releases/latest)，将下载的 `ADV_Plug-in.zip` 压缩文件解压。
+下载最新版本的插件：[Latest Release](https://github.com/Mashiro-Sorata/ADV-Plugin/releases/latest)，将下载的压缩文件解压。
 ```html
 文件夹结构如下
 │  readme.txt
 │
-├─ADV_Client
-│      adv.js
-│      index.html
+├─ADVWebClient
+│  │  ADVService.js
+│  │
+│  ├─circle
+│  │      index.html
+│  │
+│  ├─line
+│  │      index.html
+│  │
+│  └─solidcircle
+│          index.html
 │
 └─AudioDVServer
         advConfig.ini
@@ -81,7 +89,7 @@ logger = true
 ```
 
 ### 客户端配置
-压缩包内提供了一个频谱显示客户端的示例，可用SAO Utils桌面网页挂件打开。通过设置`ADV_Client`文件夹内的`index.html`文件来配置地址，端口号以及显示频谱的样式。必须保证客户端与插件设置的地址与端口号一致。示例文件已配置好，可以直接使用。也可通过编写HTML文件来定义自己的频谱显示客户端。
+压缩包内提供了三种频谱显示客户端的示例，可用SAO Utils桌面网页挂件打开。通过设置`WebClient`文件夹内的`index.html`文件来配置地址，端口号以及显示频谱的样式。必须保证客户端与插件设置的地址与端口号一致。示例文件已配置好，可以直接使用。也可通过编写HTML文件来定义自己的频谱显示客户端。
 
 可以更改`index.html`中的以下代码来自定义客户端，值得注意的是`IP`与`PORT`需要与插件的设置"一致"：
 
@@ -105,7 +113,7 @@ var CENTER_COLOR = "rgba(0,0,0,0.9)";
 
 <h2 id="u5">开发接口/API</h2>
 
-`ADV_Client`文件夹内的`adv.js`封装了一个`ADV_Plugin`类，并提供了一个`ondata()`接口方便数据的引用。
+`WebClient`文件夹内的`ADVService.js`封装了一个`ADV_Plugin`类，并提供了一个`ondata()`接口方便数据的引用。
 
 引用方法：
 ```javascript
