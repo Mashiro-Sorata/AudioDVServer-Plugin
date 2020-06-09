@@ -260,14 +260,14 @@ static int wsSend(SOCKET client, char* data, uint32_t len)
 
 //--------------CA2FFTServer类---------------------
 
-//与SENDLENGTH相关
-//将sm_ComplexSize_个fft数据压缩为SENDLENGTH/2个
+//与sm_SendLength与sm_ComplexSize_相关
+//将sm_ComplexSize_个fft数据压缩为sm_SendLength/2个
 const int CA2FFTServer::sm_DataIndex[64] = { 1, 3, 5, 6, 8, 9, 10, 11, 13, 14, 15, 17, 18, 20, 22, 24, 27, 29, 32, 35, 38, 42, 46, 50, 55, 60, 66, 72, 79, 87, 95, 104, 114, 125, 137, 149, 164, 179, 196, 215, 235, 257, 281, 308, 337, 369, 404, 442, 484, 529, 579, 634, 694, 759, 831, 909, 995, 1089, 1192, 1304, 1427, 1562, 1710, 2048 };
 const int CA2FFTServer::sm_Gap[64] = { 1, 2, 2, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1, 2, 2, 2, 3, 2, 3, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 8, 8, 9, 10, 11, 12, 12, 15, 15, 17, 19, 20, 22, 24, 27, 29, 32, 35, 38, 42, 45, 50, 55, 60, 65, 72, 78, 86, 94, 103, 112, 123, 135, 148, 338 };
 
 
 
-const u_short CA2FFTServer::sm_Interval = 25;
+const u_short CA2FFTServer::sm_Interval = 65;
 const u_short CA2FFTServer::sm_SendLength = 128;
 const u_short CA2FFTServer::sm_MonoSendLength = CA2FFTServer::sm_SendLength / 2;
 
@@ -600,6 +600,8 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService_(PVOID pParam)
 									if (j > sm_ComplexSize_ - 1)
 									{
 										sm_control_ = false;
+										sm_pAudioCapture_->sm_mutexWait.unlock();
+										LOG_ERROR("下标越界!");
 										return 1;
 									}
 									//取模
@@ -659,6 +661,8 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService_(PVOID pParam)
 								if (j > sm_ComplexSize_ - 1)
 								{
 									sm_control_ = false;
+									sm_pAudioCapture_->sm_mutexWait.unlock();
+									LOG_ERROR("下标越界!");
 									return 1;
 								}
 								//取模
@@ -698,9 +702,7 @@ unsigned int __stdcall CA2FFTServer::BufferSenderService_(PVOID pParam)
 							break;
 						case(AUDCLNT_E_BUFFER_ERROR):
 							LOG_WARN("AUDCLNT_E_BUFFER_ERROR(无法检索数据缓冲区,指针指向NULL)");
-							sm_pAudioCapture_->Stop();
 							sm_pAudioCapture_->Reset();
-							sm_pAudioCapture_->Start();
 							break;
 						case(AUDCLNT_E_OUT_OF_ORDER):
 							LOG_WARN("AUDCLNT_E_OUT_OF_ORDER(未释放数据缓冲区,先前的GetBuffer调用仍然有效)");

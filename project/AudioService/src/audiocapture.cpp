@@ -57,18 +57,20 @@ HRESULT CADataCapture::Initial()
 		return hr;
 	}
 	m_pEnumerator_->RegisterEndpointNotificationCallback(this);
-	return S_OK;
-}
 
-HRESULT CADataCapture::ExInitial_()
-{
-	HRESULT hr;
 	// get default output audio endpoint
 	hr = m_pEnumerator_->GetDefaultAudioEndpoint(eRender, eMultimedia, &m_pDevice_);
 	if (FAILED(hr)) {
 		LOG_ERROR("Faild to GetDefaultAudioEndpoint");
 		return hr;
 	}
+
+	return S_OK;
+}
+
+HRESULT CADataCapture::ExInitial_()
+{
+	HRESULT hr;
 
 	// activates device
 	hr = m_pDevice_->Activate(IID_IAudioClient, CLSCTX_ALL, NULL, (void**)&m_pAudioClient_);
@@ -179,12 +181,9 @@ bool CADataCapture::IsChanging()
 
 bool CADataCapture::ReStart()
 {
-	m_pAudioClient_->Stop();
-	m_pAudioClient_->Release();
-	CoTaskMemFree(m_pwfx_);
-
 	bool _ret = StartExInitialService();
-	if (m_start_)
+
+	if (m_start_ && _ret)
 	{
 		Start();
 	}
@@ -263,13 +262,12 @@ HRESULT STDMETHODCALLTYPE CADataCapture::OnDefaultDeviceChanged(
 			return S_OK;
 		}
 	}
-	
+	LOG_INFO("Device Changed!");
 	m_changing_ = true;
 	sm_mutexWait.lock();
 	
 	m_pDevice_->Release();
 	HRESULT hr = m_pEnumerator_->GetDevice(pwstrDefaultDeviceId, &m_pDevice_);
-	LOG_INFO("Device Changed!");
 	if (FAILED(hr))
 	{
 		LOG_ERROR("GetDevice Error!");
@@ -277,6 +275,7 @@ HRESULT STDMETHODCALLTYPE CADataCapture::OnDefaultDeviceChanged(
 		sm_mutexWait.unlock();
 		return S_OK;
 	}
+
 	ReStart();
 	sm_mutexWait.unlock();
 	m_changing_ = false;
