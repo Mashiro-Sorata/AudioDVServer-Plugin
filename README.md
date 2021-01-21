@@ -1,7 +1,7 @@
 <div align="center"><h1>AudioDVServer-Plugin</h1></div>
 
 <div align="center"><img src="https://github.com/Mashiro-Sorata/ADV-Plugin/blob/master/Image/ADV_demo.png?raw=true"></div>
-<div align="center">Powered By <a href="http://mashirosorata.vicp.io">Mashiro_Sorata</a></div>
+<div align="center">Powered By <a href="http://mashiros.top">Mashiro_Sorata</a></div>
 
 ---
 
@@ -132,7 +132,7 @@ adv.ondata = function(audioData){ //do something with audioData...};
 
 <h2 id="u6">更多</h2>
 
-我博客的[文章](http://mashirosorata.vicp.io/ADV-Plugin%E2%80%94%E2%80%94SAO%20Utils%E9%9F%B3%E9%A2%91%E5%8F%AF%E8%A7%86%E5%8C%96%E6%8F%92%E4%BB%B6.html)和这个`README`的内容上大致相同，但说明了这个项目的由来与实现，有兴趣的可以看一下。
+我博客的[文章](http://mashiros.top/ADV-Plugin%E2%80%94%E2%80%94SAO%20Utils%E9%9F%B3%E9%A2%91%E5%8F%AF%E8%A7%86%E5%8C%96%E6%8F%92%E4%BB%B6.html)和这个`README`的内容上大致相同，但说明了这个项目的由来与实现，有兴趣的可以看一下。
 
 ---
 
