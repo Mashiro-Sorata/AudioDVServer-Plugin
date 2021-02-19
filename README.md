@@ -96,14 +96,8 @@ logger = true
 * 如果插件配置文件`advConfig.ini`中的`ip = any`, 客户端`IP`可选`"local"`，或者是插件所在主机的的局域网`ip`地址（如`"192.168.1.107"`）。
 * 如果插件配置文件`advConfig.ini`中的`ip = local`， 客户端`IP`必须为参数`"local"`。
 
-```javascript
-var IP = "local";
-var PORT = 5050;
-//频谱线颜色
-var LINE_COLOR = "rgba(0,191,255,0.4)";
-//分界线的颜色
-var CENTER_COLOR = "rgba(0,0,0,0.9)";
-```
+#### 更多样式
+更多的客户端样式可在[AudioDVClient](https://github.com/Mashiro-Sorata/AudioDVClient)中下载。
 
 ### SAO Utils beta版使用注意事项
 
