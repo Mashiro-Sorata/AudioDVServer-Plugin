@@ -1,6 +1,6 @@
 <div align="center"><h1>AudioDVServer-Plugin</h1></div>
 
-<div align="center"><img src="https://github.com/Mashiro-Sorata/ADV-Plugin/blob/master/Image/ADV_demo.png?raw=true"></div>
+<div align="center"><img src="https://github.com/Mashiro-Sorata/AudioDVServer-Plugin/blob/master/Image/ADV_demo.png?raw=true"></div>
 <div align="center">Powered By <a href="http://mashiros.top">Mashiro_Sorata</a></div>
 
 ---
